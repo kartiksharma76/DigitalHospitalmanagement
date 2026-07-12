@@ -144,30 +144,45 @@
                 <!-- LOGIN SCREEN (Overlay View) -->
                 <div id="view-login" class="view-panel active-panel">
                     <div class="login-wrapper">
-                        <div class="login-card glass-panel">
+                        <div class="login-card glass-panel glow-card">
                             <div class="login-logo">
-                                <i class="fa-solid fa-circle-h"></i>
+                                <div class="logo-glow-container">
+                                    <i class="fa-solid fa-circle-h logo-glow-icon"></i>
+                                </div>
                                 <h2>AURA <span>HMS</span></h2>
                                 <p>Enterprise Clinical Ecosystem</p>
                             </div>
                             <div id="login-error" class="alert alert-danger hidden"></div>
                             <form id="loginForm" onsubmit="handleLogin(event)">
                                 <div class="form-group">
-                                    <label for="username">Username</label>
+                                    <label for="username">System ID / Username</label>
                                     <div class="input-icon-wrapper">
                                         <i class="fa-solid fa-user"></i>
-                                        <input type="text" id="username" placeholder="Enter username (e.g. admin)" required>
+                                        <input type="text" id="username" placeholder="e.g. admin" required>
                                     </div>
                                 </div>
                                 <div class="form-group">
-                                    <label for="password">Password</label>
+                                    <label for="password">Security Password</label>
                                     <div class="input-icon-wrapper">
                                         <i class="fa-solid fa-lock"></i>
-                                        <input type="password" id="password" placeholder="Enter password (e.g. admin123)" required>
+                                        <input type="password" id="password" placeholder="e.g. admin123" required>
                                     </div>
                                 </div>
-                                <button type="submit" class="btn btn-primary btn-block">Authenticate System Access</button>
+                                <button type="submit" class="btn btn-primary btn-block glow-btn">Authenticate System Access</button>
                             </form>
+                            
+                            <!-- Credentials Helper Panel -->
+                            <div class="login-hint-panel">
+                                <div class="hint-header">
+                                    <i class="fa-solid fa-key"></i>
+                                    <span>Demo Access Accounts</span>
+                                </div>
+                                <div class="hint-body">
+                                    <div class="hint-row"><strong>Admin:</strong> <span>admin</span> / <span>admin123</span></div>
+                                    <div class="hint-row"><strong>Doctor:</strong> <span>dr_smith</span> / <span>doc123</span></div>
+                                    <div class="hint-row"><strong>Nurse:</strong> <span>nurse_jane</span> / <span>nurse123</span></div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -618,6 +633,273 @@
                         </div>
                         <div class="audit-timeline" id="auditLogsTimeline">
                             <!-- Javascript insertion -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SURGICAL SUITE & OT VIEW -->
+                <div id="view-ot-suite" class="view-panel hidden">
+                    <div class="page-title">
+                        <h2>Surgical Suite & Operation Theater</h2>
+                        <p>Real-time surgery schedules, active theater bookings, and anesthesiology details</p>
+                    </div>
+                    <div class="split-view">
+                        <div class="list-section glass-panel">
+                            <div class="section-actions">
+                                <h3 class="section-subtitle">Active Schedule</h3>
+                            </div>
+                            <div class="table-container">
+                                <table class="table" id="surgeriesTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Code</th>
+                                            <th>Patient</th>
+                                            <th>Surgeon</th>
+                                            <th>Theater</th>
+                                            <th>Anesthesia</th>
+                                            <th>Date</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="surgeriesTableBody">
+                                        <!-- Dynamic JS content -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="details-section glass-panel">
+                            <h3 class="section-subtitle">Schedule New Surgery</h3>
+                            <form id="scheduleSurgeryForm" onsubmit="handleScheduleSurgery(event)" class="modern-form">
+                                <div class="form-group">
+                                    <label for="surg-patient-id">Patient</label>
+                                    <select id="surg-patient-id" required class="form-control">
+                                        <option value="">Select Patient</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="surg-surgeon-id">Surgeon</label>
+                                    <select id="surg-surgeon-id" required class="form-control">
+                                        <option value="">Select Surgeon</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="surg-date">Surgery Date</label>
+                                    <input type="date" id="surg-date" required class="form-control">
+                                </div>
+                                <div class="form-group">
+                                    <label for="surg-theater">Theater Room</label>
+                                    <select id="surg-theater" required class="form-control">
+                                        <option value="OT-01">OT-01 (Cardiovascular)</option>
+                                        <option value="OT-02">OT-02 (Neuro/Orthopedics)</option>
+                                        <option value="OT-03">OT-03 (General Surgery)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="surg-anesthesia">Anesthesia Type</label>
+                                    <select id="surg-anesthesia" required class="form-control">
+                                        <option value="General Anesthesia">General Anesthesia</option>
+                                        <option value="Local Anesthesia">Local Anesthesia</option>
+                                        <option value="Regional Anesthesia">Regional Anesthesia</option>
+                                        <option value="Epidural Anesthesia">Epidural Anesthesia</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-block">Schedule Surgery Procedure</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AMBULANCE DISPATCH VIEW -->
+                <div id="view-ambulance" class="view-panel hidden">
+                    <div class="page-title">
+                        <h2>Ambulance Dispatch & Fleet</h2>
+                        <p>Real-time telemetry, driver status, and priority emergency dispatch</p>
+                    </div>
+                    <div class="split-view">
+                        <div class="list-section glass-panel">
+                            <div class="section-actions">
+                                <h3 class="section-subtitle">Active Emergency Fleet</h3>
+                            </div>
+                            <div class="ambulance-grid" id="ambulanceGrid">
+                                <!-- Dynamic Ambulance Cards -->
+                            </div>
+                        </div>
+                        <div class="details-section glass-panel">
+                            <h3 class="section-subtitle">Add Fleet Vehicle</h3>
+                            <form id="registerAmbulanceForm" onsubmit="handleRegisterAmbulance(event)" class="modern-form">
+                                <div class="form-group">
+                                    <label for="amb-vehicle-number">Vehicle Number</label>
+                                    <input type="text" id="amb-vehicle-number" placeholder="e.g. AMB-904 (leave empty for auto)" class="form-control">
+                                </div>
+                                <div class="form-group">
+                                    <label for="amb-driver-name">Driver Full Name</label>
+                                    <input type="text" id="amb-driver-name" required placeholder="e.g. John Miller" class="form-control">
+                                </div>
+                                <div class="form-group">
+                                    <label for="amb-driver-phone">Driver Contact Phone</label>
+                                    <input type="text" id="amb-driver-phone" required placeholder="e.g. 555-0944" class="form-control">
+                                </div>
+                                <div class="form-group">
+                                    <label for="amb-fuel">Initial Fuel Level (%)</label>
+                                    <input type="number" id="amb-fuel" value="100" min="0" max="100" class="form-control">
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-block">Register Vehicle & Driver</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- BLOOD BANK VIEW -->
+                <div id="view-blood-bank" class="view-panel hidden">
+                    <div class="page-title">
+                        <h2>Blood Bank Stock & Roster</h2>
+                        <p>Track critical blood group reserves, donor history, and log blood donations</p>
+                    </div>
+                    
+                    <!-- Blood Group Stocks Summary -->
+                    <div class="blood-reserves-grid" id="bloodReservesGrid">
+                        <!-- Dynamic Blood group cards with stock levels -->
+                    </div>
+                    
+                    <div class="split-view" style="margin-top: 24px;">
+                        <div class="list-section glass-panel">
+                            <div class="section-actions">
+                                <h3 class="section-subtitle">Donor Ledger</h3>
+                            </div>
+                            <div class="table-container">
+                                <table class="table" id="donorsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Donor Name</th>
+                                            <th>Blood Group</th>
+                                            <th>Last Donated</th>
+                                            <th>Phone</th>
+                                            <th>Volume (mL)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="donorsTableBody">
+                                        <!-- Dynamic JS content -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="details-section glass-panel">
+                            <h3 class="section-subtitle">Register Donation</h3>
+                            <form id="registerDonorForm" onsubmit="handleRegisterDonor(event)" class="modern-form">
+                                <div class="form-group">
+                                    <label for="donor-name">Donor Name</label>
+                                    <input type="text" id="donor-name" required placeholder="e.g. Sarah Connor" class="form-control">
+                                </div>
+                                <div class="form-group">
+                                    <label for="donor-blood-group">Blood Group</label>
+                                    <select id="donor-blood-group" required class="form-control">
+                                        <option value="A+">A+</option>
+                                        <option value="A-">A-</option>
+                                        <option value="B+">B+</option>
+                                        <option value="B-">B-</option>
+                                        <option value="AB+">AB+</option>
+                                        <option value="AB-">AB-</option>
+                                        <option value="O+">O+</option>
+                                        <option value="O-">O-</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="donor-phone">Contact Number</label>
+                                    <input type="text" id="donor-phone" required placeholder="e.g. 555-7815" class="form-control">
+                                </div>
+                                <div class="form-group">
+                                    <label for="donor-volume">Volume Donated (mL)</label>
+                                    <input type="number" id="donor-volume" value="450" required min="100" max="1000" class="form-control">
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-block">Record Donation Entry</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CLINICIANS VIEW -->
+                <div id="view-clinicians" class="view-panel hidden">
+                    <div class="page-title">
+                        <h2>Staff & Clinicians Directory</h2>
+                        <p>Hospital specialists, department scheduling, and consultation configurations</p>
+                    </div>
+                    <div class="split-view">
+                        <div class="list-section glass-panel">
+                            <div class="section-actions">
+                                <h3 class="section-subtitle">Clinician Roster</h3>
+                            </div>
+                            <div class="table-container">
+                                <table class="table" id="doctorsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Code</th>
+                                            <th>Doctor Name</th>
+                                            <th>Specialization</th>
+                                            <th>Department</th>
+                                            <th>Degree</th>
+                                            <th>Weekly Schedule</th>
+                                            <th>Consult Fee</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="doctorsTableBody">
+                                        <!-- Dynamic JS content -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="details-section glass-panel">
+                            <h3 class="section-subtitle">Add Clinician</h3>
+                            <form id="addDoctorForm" onsubmit="handleAddDoctor(event)" class="modern-form">
+                                <div class="form-group inline-row">
+                                    <div>
+                                        <label for="doc-first-name">First Name</label>
+                                        <input type="text" id="doc-first-name" required placeholder="Sarah" class="form-control">
+                                    </div>
+                                    <div>
+                                        <label for="doc-last-name">Last Name</label>
+                                        <input type="text" id="doc-last-name" required placeholder="Smith" class="form-control">
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="doc-specialization">Specialization</label>
+                                    <input type="text" id="doc-specialization" required placeholder="e.g. Cardiology" class="form-control">
+                                </div>
+                                <div class="form-group">
+                                    <label for="doc-qualification">Qualification</label>
+                                    <input type="text" id="doc-qualification" required placeholder="e.g. MD, FACC" class="form-control">
+                                </div>
+                                <div class="form-group inline-row">
+                                    <div>
+                                        <label for="doc-experience">Experience (Years)</label>
+                                        <input type="number" id="doc-experience" required min="0" class="form-control">
+                                    </div>
+                                    <div>
+                                        <label for="doc-fee">Consultation Fee ($)</label>
+                                        <input type="number" id="doc-fee" required min="0" step="0.01" class="form-control">
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="doc-department">Department</label>
+                                    <select id="doc-department" required class="form-control">
+                                        <option value="Cardiology">Cardiology</option>
+                                        <option value="Pediatrics">Pediatrics</option>
+                                        <option value="General Medicine">General Medicine</option>
+                                        <option value="Neurology">Neurology</option>
+                                        <option value="Orthopedics">Orthopedics</option>
+                                        <option value="Surgery">Surgery</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="doc-weekly">Weekly Availability</label>
+                                    <input type="text" id="doc-weekly" value="Mon-Fri: 09:00 - 17:00" required class="form-control">
+                                </div>
+                                <div class="form-group">
+                                    <label for="doc-daily">Shift Timing</label>
+                                    <input type="text" id="doc-daily" value="Morning: 09:00 - 13:00" required class="form-control">
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-block">Add Staff Member</button>
+                            </form>
                         </div>
                     </div>
                 </div>

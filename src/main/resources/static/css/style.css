@@ -1044,3 +1044,297 @@ textarea {
     font-size: 13px;
     color: var(--text-secondary);
 }
+
+/* ==========================================================================
+   PREMIUM REDESIGN & NEW COMPONENT STYLES
+   ========================================================================== */
+
+/* Login Glow & Hint Panel */
+.glow-card {
+    position: relative;
+    border: 1px solid rgba(6, 182, 212, 0.2) !important;
+    box-shadow: 0 0 40px rgba(6, 182, 212, 0.15) !important;
+    transition: var(--transition);
+}
+.glow-card:hover {
+    box-shadow: 0 0 50px rgba(6, 182, 212, 0.25) !important;
+    border-color: rgba(6, 182, 212, 0.4) !important;
+}
+
+.logo-glow-container {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 8px;
+    animation: floatGlow 3s ease-in-out infinite;
+}
+
+.logo-glow-icon {
+    font-size: 52px;
+    color: var(--neon-cyan);
+    filter: drop-shadow(0 0 16px rgba(6, 182, 212, 0.8));
+}
+
+@keyframes floatGlow {
+    0% { transform: translateY(0px); filter: drop-shadow(0 0 8px rgba(6, 182, 212, 0.4)); }
+    50% { transform: translateY(-8px); filter: drop-shadow(0 0 20px rgba(6, 182, 212, 0.8)); }
+    100% { transform: translateY(0px); filter: drop-shadow(0 0 8px rgba(6, 182, 212, 0.4)); }
+}
+
+.glow-btn {
+    background: linear-gradient(135deg, var(--neon-cyan), var(--neon-violet)) !important;
+    border: none !important;
+    font-weight: 600;
+    color: white;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
+    transition: var(--transition);
+}
+.glow-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(6, 182, 212, 0.5), 0 0 10px rgba(139, 92, 246, 0.4);
+}
+.glow-btn:active {
+    transform: translateY(0);
+}
+
+.login-hint-panel {
+    margin-top: 24px;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+}
+
+.hint-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--neon-cyan);
+    margin-bottom: 10px;
+}
+
+.hint-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12px;
+}
+
+.hint-row {
+    display: flex;
+    justify-content: space-between;
+    color: var(--text-secondary);
+}
+
+.hint-row strong {
+    color: var(--text-primary);
+}
+
+.hint-row span {
+    font-family: monospace;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 1px 4px;
+    border-radius: 3px;
+    color: var(--neon-violet);
+}
+
+/* Form Styles */
+.modern-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.form-control {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    padding: 10px 14px;
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-family: var(--font-primary);
+    font-size: 14px;
+    transition: var(--transition);
+}
+.form-control:focus {
+    outline: none;
+    border-color: var(--neon-cyan);
+    box-shadow: 0 0 10px rgba(6, 182, 212, 0.25);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.form-group select.form-control option {
+    background-color: var(--bg-dark);
+    color: var(--text-primary);
+}
+
+.section-subtitle {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 16px;
+}
+
+/* Ambulance View Styles */
+.ambulance-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+    margin-top: 12px;
+}
+
+.ambulance-card {
+    background: rgba(15, 23, 42, 0.4);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 20px;
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+}
+.ambulance-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(6, 182, 212, 0.3);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.ambulance-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.ambulance-card-header h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.ambulance-icon-badge {
+    font-size: 20px;
+    color: var(--neon-rose);
+    filter: drop-shadow(0 0 6px rgba(244, 63, 94, 0.4));
+}
+
+.ambulance-details {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+}
+
+.ambulance-details p {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ambulance-details i {
+    width: 16px;
+    text-align: center;
+    color: var(--neon-cyan);
+}
+
+.fuel-indicator {
+    margin-bottom: 16px;
+}
+
+.fuel-label-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
+.fuel-bar-container {
+    height: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.fuel-bar {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.5s ease-in-out;
+}
+
+.fuel-green { background: var(--neon-emerald); }
+.fuel-yellow { background: var(--neon-amber); }
+.fuel-red { background: var(--neon-rose); }
+
+.ambulance-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.ambulance-actions button {
+    flex: 1;
+    font-size: 12px;
+    padding: 8px;
+}
+
+/* Blood Bank View Styles */
+.blood-reserves-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 12px;
+}
+
+@media (max-width: 1200px) {
+    .blood-reserves-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+@media (max-width: 600px) {
+    .blood-reserves-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.blood-reserve-card {
+    background: rgba(15, 23, 42, 0.5);
+    border: 1px solid var(--border-color);
+    border-top: 3px solid var(--neon-rose);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    transition: var(--transition);
+}
+.blood-reserve-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(244, 63, 94, 0.15);
+}
+
+.blood-group-label {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--neon-rose);
+    text-shadow: 0 0 10px rgba(244, 63, 94, 0.4);
+}
+
+.blood-volume {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.blood-donor-badge {
+    background: rgba(244, 63, 94, 0.1);
+    color: var(--neon-rose);
+    border: 1px solid rgba(244, 63, 94, 0.3);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: bold;
+}

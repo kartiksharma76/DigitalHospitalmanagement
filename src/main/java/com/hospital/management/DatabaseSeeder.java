@@ -50,8 +50,28 @@ public class DatabaseSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        if (userRepository.count() > 0) {
-            return; // Already seeded
+        if (userRepository.findByUsername("admin").isPresent()) {
+            System.out.println("DatabaseSeeder: 'admin' user already exists. Skipping database seeding.");
+            return;
+        }
+
+        System.out.println("DatabaseSeeder: Default 'admin' user not found. Reseeding all database tables...");
+        
+        try {
+            // Delete all records to start fresh and avoid foreign key conflicts
+            auditLogRepository.deleteAll();
+            surgeryRepository.deleteAll();
+            medicalRecordRepository.deleteAll();
+            billingRepository.deleteAll();
+            appointmentRepository.deleteAll();
+            patientRepository.deleteAll();
+            doctorRepository.deleteAll();
+            userRepository.deleteAll();
+            inventoryItemRepository.deleteAll();
+            ambulanceRepository.deleteAll();
+            bloodDonorRepository.deleteAll();
+        } catch (Exception e) {
+            System.out.println("DatabaseSeeder Warning: Error clearing tables, will try seeding anyway: " + e.getMessage());
         }
 
         System.out.println("Seeding database with default records...");

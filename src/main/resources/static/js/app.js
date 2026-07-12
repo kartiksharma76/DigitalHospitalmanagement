@@ -88,6 +88,10 @@ function navigate(panelId) {
         if (panelId === 'billing') loadBilling();
         if (panelId === 'inventory') loadInventory();
         if (panelId === 'compliance') loadAuditLogs();
+        if (panelId === 'ot-suite') loadSurgeries();
+        if (panelId === 'ambulance') loadAmbulances();
+        if (panelId === 'blood-bank') loadBloodBank();
+        if (panelId === 'clinicians') loadClinicians();
     }
 }
 
@@ -1195,5 +1199,424 @@ function handleGlobalSearch() {
             i.itemCode.toLowerCase().includes(query)
         );
         renderInventoryTable(filtered);
+    }
+}
+
+// ==========================================================================
+// SURGERY SUITE & OPERATION THEATER MANAGEMENT
+// ==========================================================================
+async function loadSurgeries() {
+    const tbody = document.getElementById("surgeriesTableBody");
+    if (!tbody) return;
+    
+    tbody.innerHTML = `<tr><td colspan="8"><i class="fa-solid fa-spinner fa-spin"></i> Loading surgeries...</td></tr>`;
+    
+    // Populate form dropdown options
+    populateSurgerySelectors();
+    
+    try {
+        const res = await fetch("/api/surgeries");
+        if (res.ok) {
+            const surgeries = await res.json();
+            tbody.innerHTML = "";
+            if (surgeries.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted)">No surgeries currently scheduled.</td></tr>`;
+                return;
+            }
+            surgeries.forEach(s => {
+                let statusClass = "badge-cyan";
+                if (s.status === "Completed") statusClass = "badge-emerald";
+                else if (s.status === "In_Progress") statusClass = "badge-pulse badge-danger";
+                else if (s.status === "Post_Op_Recovery") statusClass = "badge-amber";
+                
+                tbody.innerHTML += `
+                    <tr>
+                        <td><strong>${s.surgeryCode}</strong></td>
+                        <td>${s.patient.firstName} ${s.patient.lastName}</td>
+                        <td>Dr. ${s.surgeon.firstName} ${s.surgeon.lastName}</td>
+                        <td><span class="badge badge-secondary">${s.theaterRoom}</span></td>
+                        <td>${s.anesthesiaType}</td>
+                        <td>${s.date}</td>
+                        <td><span class="badge ${statusClass}">${s.status.replace('_', ' ')}</span></td>
+                        <td>
+                            <div class="ambulance-actions">
+                                <button class="btn btn-secondary btn-sm" onclick="updateSurgeryStatus(${s.id}, 'In_Progress')">Start</button>
+                                <button class="btn btn-primary btn-sm" onclick="updateSurgeryStatus(${s.id}, 'Completed')">Complete</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--neon-rose)">Failed to retrieve surgery database.</td></tr>`;
+    }
+}
+
+async function updateSurgeryStatus(id, newStatus) {
+    if (!activeSession) return;
+    try {
+        const res = await fetch(`/api/surgeries/${id}/status?status=${newStatus}&requestedBy=${activeSession.username}&role=${activeSession.role}`, {
+            method: "PUT"
+        });
+        if (res.ok) {
+            loadSurgeries();
+        } else {
+            alert("Error: Unable to update surgery status.");
+        }
+    } catch (e) {
+        console.error("Error updating surgery status", e);
+    }
+}
+
+async function handleScheduleSurgery(event) {
+    event.preventDefault();
+    if (!activeSession) return;
+    
+    const patientId = document.getElementById("surg-patient-id").value;
+    const surgeonId = document.getElementById("surg-surgeon-id").value;
+    const date = document.getElementById("surg-date").value;
+    const theater = document.getElementById("surg-theater").value;
+    const anesthesia = document.getElementById("surg-anesthesia").value;
+    
+    try {
+        const res = await fetch(`/api/surgeries?requestedBy=${activeSession.username}&role=${activeSession.role}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                patient: { id: parseInt(patientId) },
+                surgeon: { id: parseInt(surgeonId) },
+                date: date,
+                theaterRoom: theater,
+                anesthesiaType: anesthesia,
+                status: "Scheduled"
+            })
+        });
+        
+        if (res.ok) {
+            alert("Surgery procedure scheduled and logged successfully!");
+            document.getElementById("scheduleSurgeryForm").reset();
+            loadSurgeries();
+        } else {
+            alert("Failed to schedule surgery. Please check input parameters.");
+        }
+    } catch (e) {
+        console.error("Error scheduling surgery:", e);
+    }
+}
+
+async function populateSurgerySelectors() {
+    const patientSelect = document.getElementById("surg-patient-id");
+    const doctorSelect = document.getElementById("surg-surgeon-id");
+    
+    if (!patientSelect || !doctorSelect) return;
+    
+    try {
+        const [patientsRes, doctorsRes] = await Promise.all([
+            fetch("/api/patients"),
+            fetch("/api/doctors")
+        ]);
+        
+        if (patientsRes.ok && doctorsRes.ok) {
+            const patients = await patientsRes.json();
+            const doctors = await doctorsRes.json();
+            
+            patientSelect.innerHTML = '<option value="">Select Patient</option>' + 
+                patients.map(p => `<option value="${p.id}">${p.firstName} ${p.lastName} (${p.patientId})</option>`).join('');
+                
+            doctorSelect.innerHTML = '<option value="">Select Surgeon</option>' + 
+                doctors.map(d => `<option value="${d.id}">Dr. ${d.firstName} ${d.lastName} (${d.specialization})</option>`).join('');
+        }
+    } catch (e) {
+        console.error("Error populating surgery form selectors:", e);
+    }
+}
+
+// ==========================================================================
+// AMBULANCE DISPATCH & TELEMETRY
+// ==========================================================================
+async function loadAmbulances() {
+    const grid = document.getElementById("ambulanceGrid");
+    if (!grid) return;
+    
+    grid.innerHTML = `<div style="grid-column: 1/-1;"><i class="fa-solid fa-spinner fa-spin"></i> Retrieving fleet status indicators...</div>`;
+    
+    try {
+        const res = await fetch("/api/ambulances");
+        if (res.ok) {
+            const fleet = await res.json();
+            grid.innerHTML = "";
+            if (fleet.length === 0) {
+                grid.innerHTML = `<div style="grid-column: 1/-1; text-align:center; color:var(--text-muted)">No ambulance vehicles registered in the system.</div>`;
+                return;
+            }
+            
+            fleet.forEach(amb => {
+                let statusClass = "badge-emerald";
+                if (amb.status === "Dispatched") statusClass = "badge-pulse badge-danger";
+                else if (amb.status === "Maintenance") statusClass = "badge-amber";
+                
+                let fuelColorClass = "fuel-green";
+                if (amb.fuelLevel < 25) fuelColorClass = "fuel-red";
+                else if (amb.fuelLevel < 60) fuelColorClass = "fuel-yellow";
+                
+                grid.innerHTML += `
+                    <div class="ambulance-card">
+                        <div class="ambulance-card-header">
+                            <h3>${amb.vehicleNumber}</h3>
+                            <i class="fa-solid fa-truck-medical ambulance-icon-badge"></i>
+                        </div>
+                        <div class="ambulance-details">
+                            <p><i class="fa-solid fa-user-tie"></i> Driver: <strong>${amb.driverName}</strong></p>
+                            <p><i class="fa-solid fa-phone"></i> Phone: ${amb.driverPhone}</p>
+                            <p><i class="fa-solid fa-location-dot"></i> Telemetry: [${amb.currentLatitude}, ${amb.currentLongitude}]</p>
+                            <p><i class="fa-solid fa-signal"></i> Status: <span class="badge ${statusClass}">${amb.status}</span></p>
+                        </div>
+                        <div class="fuel-indicator">
+                            <div class="fuel-label-row">
+                                <span>Fuel Tank Level</span>
+                                <span>${amb.fuelLevel}%</span>
+                            </div>
+                            <div class="fuel-bar-container">
+                                <div class="fuel-bar ${fuelColorClass}" style="width: ${amb.fuelLevel}%"></div>
+                            </div>
+                        </div>
+                        <div class="ambulance-actions">
+                            <button class="btn btn-secondary btn-sm" onclick="updateAmbulanceStatus(${amb.id}, 'Available')">Available</button>
+                            <button class="btn btn-primary btn-sm" onclick="updateAmbulanceStatus(${amb.id}, 'Dispatched')">Dispatch</button>
+                            <button class="btn btn-secondary btn-sm" onclick="updateAmbulanceStatus(${amb.id}, 'Maintenance')">Service</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+    } catch (e) {
+        grid.innerHTML = `<div style="grid-column: 1/-1; color:var(--neon-rose)">Failed to communicate with fleet GPS servers.</div>`;
+    }
+}
+
+async function updateAmbulanceStatus(id, newStatus) {
+    if (!activeSession) return;
+    try {
+        const res = await fetch(`/api/ambulances/${id}/status?status=${newStatus}&requestedBy=${activeSession.username}&role=${activeSession.role}`, {
+            method: "PUT"
+        });
+        if (res.ok) {
+            loadAmbulances();
+        } else {
+            alert("Error: Unable to update fleet status.");
+        }
+    } catch (e) {
+        console.error("Error updating ambulance status", e);
+    }
+}
+
+async function handleRegisterAmbulance(event) {
+    event.preventDefault();
+    if (!activeSession) return;
+    
+    const number = document.getElementById("amb-vehicle-number").value;
+    const name = document.getElementById("amb-driver-name").value;
+    const phone = document.getElementById("amb-driver-phone").value;
+    const fuel = document.getElementById("amb-fuel").value;
+    
+    try {
+        const res = await fetch(`/api/ambulances?requestedBy=${activeSession.username}&role=${activeSession.role}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                vehicleNumber: number ? number : null,
+                driverName: name,
+                driverPhone: phone,
+                fuelLevel: parseFloat(fuel),
+                status: "Available"
+            })
+        });
+        
+        if (res.ok) {
+            alert("Ambulance registered and synchronized in active dispatch!");
+            document.getElementById("registerAmbulanceForm").reset();
+            loadAmbulances();
+        } else {
+            alert("Failed to register ambulance. Check server configurations.");
+        }
+    } catch (e) {
+        console.error("Error registering vehicle:", e);
+    }
+}
+
+// ==========================================================================
+// BLOOD BANK STORAGE & RESERVES
+// ==========================================================================
+async function loadBloodBank() {
+    const reservesGrid = document.getElementById("bloodReservesGrid");
+    const tbody = document.getElementById("donorsTableBody");
+    if (!reservesGrid || !tbody) return;
+    
+    reservesGrid.innerHTML = `<div>Loading reserves...</div>`;
+    tbody.innerHTML = `<tr><td colspan="5"><i class="fa-solid fa-spinner fa-spin"></i> Retrieving donor lists...</td></tr>`;
+    
+    try {
+        const res = await fetch("/api/blood-bank");
+        if (res.ok) {
+            const donors = await res.json();
+            
+            // Map donation records to groups
+            const reserves = {
+                "A+": 0, "A-": 0, "B+": 0, "B-": 0, "AB+": 0, "AB-": 0, "O+": 0, "O-": 0
+            };
+            
+            tbody.innerHTML = "";
+            
+            if (donors.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted)">No donation activity recorded.</td></tr>`;
+            } else {
+                donors.forEach(d => {
+                    if (reserves[d.bloodGroup] !== undefined) {
+                        reserves[d.bloodGroup] += d.volumeMl;
+                    }
+                    tbody.innerHTML += `
+                        <tr>
+                            <td><strong>${d.donorName}</strong></td>
+                            <td><span class="blood-donor-badge">${d.bloodGroup}</span></td>
+                            <td>${d.lastDonatedDate}</td>
+                            <td>${d.contactPhone}</td>
+                            <td>${d.volumeMl} mL</td>
+                        </tr>
+                    `;
+                });
+            }
+            
+            // Render reserves summary
+            reservesGrid.innerHTML = "";
+            Object.keys(reserves).forEach(group => {
+                reservesGrid.innerHTML += `
+                    <div class="blood-reserve-card">
+                        <div class="blood-group-label">${group}</div>
+                        <div class="blood-volume">${reserves[group]} mL</div>
+                    </div>
+                `;
+            });
+        }
+    } catch (e) {
+        reservesGrid.innerHTML = `<div style="color:var(--neon-rose)">Failed to sync with blood banking database.</div>`;
+        tbody.innerHTML = `<tr><td colspan="5">Connection failed.</td></tr>`;
+    }
+}
+
+async function handleRegisterDonor(event) {
+    event.preventDefault();
+    if (!activeSession) return;
+    
+    const name = document.getElementById("donor-name").value;
+    const group = document.getElementById("donor-blood-group").value;
+    const phone = document.getElementById("donor-phone").value;
+    const volume = document.getElementById("donor-volume").value;
+    
+    const today = new Date().toISOString().split('T')[0];
+    
+    try {
+        const res = await fetch(`/api/blood-bank?requestedBy=${activeSession.username}&role=${activeSession.role}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                donorName: name,
+                bloodGroup: group,
+                lastDonatedDate: today,
+                contactPhone: phone,
+                volumeMl: parseInt(volume)
+            })
+        });
+        
+        if (res.ok) {
+            alert("Donation logged successfully in the blood bank database!");
+            document.getElementById("registerDonorForm").reset();
+            loadBloodBank();
+        } else {
+            alert("Unable to log donation. Check server parameters.");
+        }
+    } catch (e) {
+        console.error("Error saving donor details:", e);
+    }
+}
+
+// ==========================================================================
+// CLINICIANS & STAFF ROSTER
+// ==========================================================================
+async function loadClinicians() {
+    const tbody = document.getElementById("doctorsTableBody");
+    if (!tbody) return;
+    
+    tbody.innerHTML = `<tr><td colspan="7"><i class="fa-solid fa-spinner fa-spin"></i> Retrieving clinician roster...</td></tr>`;
+    
+    try {
+        const res = await fetch("/api/doctors");
+        if (res.ok) {
+            const doctors = await res.json();
+            tbody.innerHTML = "";
+            if (doctors.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted)">No registered staff members.</td></tr>`;
+                return;
+            }
+            doctors.forEach(d => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td><strong>${d.doctorId}</strong></td>
+                        <td>Dr. ${d.firstName} ${d.lastName}</td>
+                        <td>${d.specialization}</td>
+                        <td><span class="badge badge-secondary">${d.department}</span></td>
+                        <td>${d.qualification || 'N/A'}</td>
+                        <td>${d.availability}</td>
+                        <td>$${d.consultationFee.toFixed(2)}</td>
+                    </tr>
+                `;
+            });
+        }
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--neon-rose)">Failed to communicate with staff database.</td></tr>`;
+    }
+}
+
+async function handleAddDoctor(event) {
+    event.preventDefault();
+    if (!activeSession) return;
+    
+    const first = document.getElementById("doc-first-name").value;
+    const last = document.getElementById("doc-last-name").value;
+    const spec = document.getElementById("doc-specialization").value;
+    const qual = document.getElementById("doc-qualification").value;
+    const exp = document.getElementById("doc-experience").value;
+    const fee = document.getElementById("doc-fee").value;
+    const dept = document.getElementById("doc-department").value;
+    const weekly = document.getElementById("doc-weekly").value;
+    const daily = document.getElementById("doc-daily").value;
+    
+    try {
+        const res = await fetch(`/api/doctors?requestedBy=${activeSession.username}&role=${activeSession.role}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                firstName: first,
+                lastName: last,
+                specialization: spec,
+                qualification: qual,
+                experienceYears: parseInt(exp),
+                department: dept,
+                consultationFee: parseFloat(fee),
+                availability: weekly,
+                shiftTimings: daily,
+                active: true
+            })
+        });
+        
+        if (res.ok) {
+            alert("New clinician registered and activated successfully!");
+            document.getElementById("addDoctorForm").reset();
+            loadClinicians();
+        } else {
+            alert("Failed to add clinician. Verify parameters.");
+        }
+    } catch (e) {
+        console.error("Error creating staff record:", e);
     }
 }
