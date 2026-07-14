@@ -27,6 +27,9 @@ public class InventoryItem {
 
     private String supplierName;
     private String location; // e.g. Pharmacy A, Main Warehouse, ICU Cabinet
+    private String imageUrl;
+    @Column(length = 2000)
+    private String description;
 
     // Constructors
     public InventoryItem() {
@@ -34,6 +37,12 @@ public class InventoryItem {
 
     public InventoryItem(String itemCode, String name, String category, int stockQuantity, 
                          int reorderLevel, double unitPrice, String expiryDate, String supplierName, String location) {
+        this(itemCode, name, category, stockQuantity, reorderLevel, unitPrice, expiryDate, supplierName, location, null, null);
+    }
+
+    public InventoryItem(String itemCode, String name, String category, int stockQuantity, 
+                         int reorderLevel, double unitPrice, String expiryDate, String supplierName, String location,
+                         String imageUrl, String description) {
         this.itemCode = itemCode;
         this.name = name;
         this.category = category;
@@ -43,6 +52,8 @@ public class InventoryItem {
         this.expiryDate = expiryDate;
         this.supplierName = supplierName;
         this.location = location;
+        this.imageUrl = imageUrl;
+        this.description = description;
     }
 
     // Getters and Setters
@@ -124,5 +135,21 @@ public class InventoryItem {
 
     public void setLocation(String location) {
         this.location = location;
+    }
+
+    public String getImageUrl() {
+        return imageUrl;
+    }
+
+    public void setImageUrl(String imageUrl) {
+        this.imageUrl = imageUrl;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 }

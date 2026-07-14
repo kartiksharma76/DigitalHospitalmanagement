@@ -51,4 +51,16 @@ public class InventoryController {
         }
         return ResponseEntity.notFound().build();
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteInventoryItem(@PathVariable Long id, @RequestParam String requestedBy, @RequestParam String role, HttpServletRequest request) {
+        Optional<InventoryItem> itemOpt = inventoryItemRepository.findById(id);
+        if (itemOpt.isPresent()) {
+            InventoryItem item = itemOpt.get();
+            inventoryItemRepository.delete(item);
+            auditService.log(requestedBy, "DELETE_INVENTORY_ITEM", role, "Deleted inventory item: " + item.getName() + " [Code: " + item.getItemCode() + "]", request.getRemoteAddr());
+            return ResponseEntity.ok().build();
+        }
+        return ResponseEntity.notFound().build();
+    }
 }

@@ -166,7 +166,7 @@
             <div id="content-pane" class="content-pane">
                 
                 <!-- LOGIN SCREEN (Overlay View) -->
-                <div id="view-login" class="view-panel active-panel">
+                <div id="view-login" class="view-panel active-panel auth-view-panel">
                     <div class="login-wrapper">
                         <div class="login-card glass-panel glow-card">
                             <div class="login-logo">
@@ -217,7 +217,7 @@
                 </div>
 
                 <!-- FORGOT PASSWORD VIEW -->
-                <div id="view-forgot-password" class="view-panel hidden">
+                <div id="view-forgot-password" class="view-panel hidden auth-view-panel">
                     <div class="login-wrapper">
                         <div class="login-card glass-panel glow-card">
                             <div class="login-logo">
@@ -267,7 +267,7 @@
                 </div>
 
                 <!-- PATIENT REGISTRATION VIEW -->
-                <div id="view-patient-registration" class="view-panel hidden">
+                <div id="view-patient-registration" class="view-panel hidden auth-view-panel">
                     <div class="login-wrapper" style="max-width: 900px; padding: 20px 0; display:block; margin: 40px auto;">
                         <div class="login-card glass-panel glow-card" style="width: 100%; max-width: 850px; padding: 32px;">
                             <div class="login-logo" style="margin-bottom:24px;">
@@ -335,8 +335,14 @@
                                         </div>
 
                                         <div class="form-group">
-                                            <label>Profile Photo URL (Optional)</label>
-                                            <input type="url" id="self-photo" placeholder="e.g. https://example.com/photo.png">
+                                            <label>Profile Photo (File Upload or URL Link)</label>
+                                            <div style="display:flex; gap:10px;">
+                                                <input type="text" id="self-photo" placeholder="Paste image link URL or choose file..." style="flex:1;">
+                                                <label class="btn btn-secondary" style="margin:0; padding:10px 15px; display:inline-flex; align-items:center; cursor:pointer; font-size:13px;">
+                                                    <i class="fa-solid fa-upload"></i> Browse...
+                                                    <input type="file" id="self-photo-file-picker" accept="image/*" style="display:none;" onchange="handleFileSelect(this, 'self-photo')">
+                                                </label>
+                                            </div>
                                         </div>
                                         
                                         <h3 style="margin:20px 0 12px 0; font-size:15px; text-transform:uppercase; letter-spacing:0.5px; color:var(--neon-cyan)"><i class="fa-solid fa-location-dot"></i> Home Address</h3>
@@ -415,14 +421,35 @@
                                         </div>
                                         
                                         <h3 style="margin:20px 0 12px 0; font-size:15px; text-transform:uppercase; letter-spacing:0.5px; color:var(--neon-cyan)"><i class="fa-solid fa-id-card-clip"></i> Identity & Insurance</h3>
-                                        <div class="form-group" style="display:grid; grid-template-columns:1.2fr 0.8fr; gap:12px;">
+                                        
+                                        <!-- Hidden fallback inputs for password resets / backward DB compatibility -->
+                                        <input type="hidden" id="self-aadhaar" value="">
+                                        <input type="hidden" id="self-pan" value="">
+
+                                        <div class="form-group" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
                                             <div>
-                                                <label>Aadhaar Number (12 Digit)</label>
-                                                <input type="text" id="self-aadhaar" required placeholder="e.g. 123456789012" pattern="\d{12}">
+                                                <label>Verification ID Type</label>
+                                                <select id="self-id-type" required>
+                                                    <option value="Aadhaar Card">Aadhaar Card</option>
+                                                    <option value="PAN Card">PAN Card</option>
+                                                    <option value="Passport">Passport</option>
+                                                    <option value="Voter ID">Voter ID Card</option>
+                                                </select>
                                             </div>
                                             <div>
-                                                <label>PAN Card (Optional)</label>
-                                                <input type="text" id="self-pan" placeholder="ABCDE1234F">
+                                                <label>ID Card Number</label>
+                                                <input type="text" id="self-id-number" required placeholder="Enter ID card number">
+                                            </div>
+                                        </div>
+
+                                        <div class="form-group">
+                                            <label>ID Proof Image (File Upload or URL Link)</label>
+                                            <div style="display:flex; gap:10px;">
+                                                <input type="text" id="self-id-card-image" placeholder="Paste image link URL or choose file..." style="flex:1;">
+                                                <label class="btn btn-secondary" style="margin:0; padding:10px 15px; display:inline-flex; align-items:center; cursor:pointer; font-size:13px;">
+                                                    <i class="fa-solid fa-upload"></i> Browse...
+                                                    <input type="file" id="self-id-file-picker" accept="image/*" style="display:none;" onchange="handleFileSelect(this, 'self-id-card-image')">
+                                                </label>
                                             </div>
                                         </div>
                                         <div class="form-group">
@@ -724,18 +751,30 @@
                     
                     <div class="telemed-grid">
                         <div class="video-window glass-panel">
-                            <div class="video-container main-feed">
-                                <div class="video-label">Doctor Stream</div>
-                                <i class="fa-solid fa-user-md placeholder-video"></i>
+                            <!-- Main Feed: Remote Patient simulation -->
+                            <div class="video-container main-feed" style="position:relative; background:#080b11;">
+                                <div class="video-label" id="telemed-patient-label" style="z-index: 10;">Remote Patient</div>
+                                <canvas id="telemed-remote-canvas" style="width:100%; height:100%; object-fit:cover; display:none; background:#080b11;"></canvas>
+                                <div id="telemed-remote-placeholder" style="display:flex; flex-direction:column; align-items:center; justify-content:center; width:100%; height:100%;">
+                                    <i class="fa-solid fa-user placeholder-video" style="font-size:52px; color:var(--neon-violet); margin-bottom:12px; filter: drop-shadow(0 0 10px rgba(139, 92, 246, 0.4));"></i>
+                                    <span style="font-size:13px; color:var(--text-secondary);">Waiting to connect remote stream...</span>
+                                </div>
                             </div>
-                            <div class="video-container secondary-feed">
-                                <div class="video-label">Remote Patient (Elena Rostova)</div>
-                                <i class="fa-solid fa-user placeholder-video"></i>
+                            
+                            <!-- Secondary Feed: Local Doctor webcam stream (PIP window) -->
+                            <div class="video-container secondary-feed" style="position:absolute; background:#050811; overflow:hidden; border:1px solid rgba(255,255,255,0.15);">
+                                <div class="video-label" style="z-index: 10;">Doctor Stream (You)</div>
+                                <video id="telemed-local-video" autoplay playsinline style="width:100%; height:100%; object-fit:cover; transform: scaleX(-1); display:none;"></video>
+                                <div id="telemed-local-placeholder" style="display:flex; flex-direction:column; align-items:center; justify-content:center; width:100%; height:100%;">
+                                    <i class="fa-solid fa-user-md placeholder-video" style="font-size:24px; color:var(--neon-cyan); margin-bottom:4px;"></i>
+                                    <span style="font-size:10px; color:var(--text-muted);">Camera is Off</span>
+                                </div>
                             </div>
+                            
                             <div class="video-controls">
-                                <button class="video-action"><i class="fa-solid fa-microphone"></i></button>
-                                <button class="video-action"><i class="fa-solid fa-video"></i></button>
-                                <button class="video-action hangup"><i class="fa-solid fa-phone-slash"></i></button>
+                                <button class="video-action" id="telemed-mic-btn" onclick="toggleTelemedMic()"><i class="fa-solid fa-microphone"></i></button>
+                                <button class="video-action" id="telemed-video-btn" onclick="toggleTelemedVideo()"><i class="fa-solid fa-video"></i></button>
+                                <button class="video-action hangup" onclick="hangupTelemed()"><i class="fa-solid fa-phone-slash"></i></button>
                             </div>
                         </div>
                         <div class="chat-notes glass-panel">
@@ -878,30 +917,32 @@
                         <h2>Clinical Stock & Pharmacy Inventory</h2>
                         <p>Track stocks, category levels and replenish thresholds</p>
                     </div>
-                    
-                    <div class="glass-panel">
-                        <div class="section-actions">
-                            <button class="btn btn-primary" onclick="showAddInventoryForm()"><i class="fa-solid fa-plus"></i> Add Inventory Stock</button>
+
+                    <!-- E-Commerce Inventory Tools -->
+                    <div class="glass-panel" style="margin-bottom: 20px; padding: 16px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+                        <div class="search-bar" style="flex:1; width:auto; max-width: 400px; margin-bottom: 0;">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="inventory-search-input" placeholder="Search clinical supplies or medicines..." oninput="handleInventorySearch()">
                         </div>
-                        <div class="table-container">
-                            <table class="table" id="inventoryTable">
-                                <thead>
-                                    <tr>
-                                        <th>Code</th>
-                                        <th>Item Name</th>
-                                        <th>Category</th>
-                                        <th>Available Stock</th>
-                                        <th>Reorder Level</th>
-                                        <th>Unit Cost</th>
-                                        <th>Status Alert</th>
-                                        <th>Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <!-- Javascript insertion -->
-                                </tbody>
-                            </table>
-                        </div>
+                        <button class="btn btn-primary" onclick="showAddInventoryForm()"><i class="fa-solid fa-plus"></i> Add Product Stock</button>
+                    </div>
+
+                    <!-- Category Tab Bar -->
+                    <div class="glass-panel" style="margin-bottom: 20px; padding: 10px 16px; display: flex; gap: 8px; overflow-x: auto;">
+                        <button class="btn btn-secondary btn-sm active-tab" onclick="filterInventoryItems('All')">All Products</button>
+                        <button class="btn btn-secondary btn-sm" onclick="filterInventoryItems('Tablets')">Tablets</button>
+                        <button class="btn btn-secondary btn-sm" onclick="filterInventoryItems('Capsules')">Capsules</button>
+                        <button class="btn btn-secondary btn-sm" onclick="filterInventoryItems('Syrups')">Syrups</button>
+                        <button class="btn btn-secondary btn-sm" onclick="filterInventoryItems('Injections')">Injections</button>
+                        <button class="btn btn-secondary btn-sm" onclick="filterInventoryItems('Creams')">Creams</button>
+                        <button class="btn btn-secondary btn-sm" onclick="filterInventoryItems('Medical Equipment')">Equipment</button>
+                        <button class="btn btn-secondary btn-sm" onclick="filterInventoryItems('Hospital Supplies')">Supplies</button>
+                        <button class="btn btn-secondary btn-sm" onclick="filterInventoryItems('Packages')">Health Packages</button>
+                    </div>
+
+                    <!-- Modern Product stock grid -->
+                    <div class="product-grid" id="inventory-products-grid">
+                        <!-- Product cards dynamically loaded here -->
                     </div>
                 </div>
 
@@ -1297,6 +1338,13 @@
                                         </tbody>
                                     </table>
                                 </div>
+                                <!-- Live Tracker Panel -->
+                                <div id="patient-order-tracker-container" class="hidden" style="margin-top:20px; border-top:1.5px dashed var(--border-color); padding-top:20px;">
+                                    <h4 style="font-size:13.5px; color:var(--neon-cyan); margin-bottom:16px;"><i class="fa-solid fa-truck-ramp-box"></i> Live Courier Tracking Timeline</h4>
+                                    <div class="order-tracker-timeline" id="patient-order-timeline">
+                                        <!-- Timelines will be injected dynamically -->
+                                    </div>
+                                </div>
                             </div>
                             
                             <div id="tab-bookings" class="patient-tab-content hidden">
@@ -1363,6 +1411,14 @@
                         <div style="position: absolute; bottom: 20px; left: 24px; text-shadow: 0 2px 10px rgba(0,0,0,0.8);">
                             <h3 style="font-family: var(--font-secondary); font-size: 19px; font-weight: 800; color: #fff; text-shadow: 0 0 10px rgba(16,185,129,0.5);">AURA MEDICAL DISPENSARY</h3>
                             <p style="font-size: 12px; color: var(--text-secondary); margin-top: 4px; font-weight: 500;">Procure Authenticated Life-Saving Drugs, Supplements, and Diagnostic Kits</p>
+                        </div>
+                    </div>
+
+                    <!-- E-Commerce Search Bar -->
+                    <div class="glass-panel" style="margin-bottom: 20px; padding: 12px 20px; display: flex; align-items: center; gap: 16px;">
+                        <div class="search-bar" style="flex:1; width:auto; max-width:100%;">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="store-search-input" placeholder="Search medicines, healthcare packages, or equipment by name..." oninput="handleStoreSearch()">
                         </div>
                     </div>
                     
@@ -1519,6 +1575,166 @@
 
             </div>
         </main>
+    </div>
+
+    <!-- Full Screen Image Lightbox Modal -->
+    <div id="imageLightboxModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(8, 11, 17, 0.95); backdrop-filter: blur(10px); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column;">
+        <button onclick="closeLightboxModal()" style="position: absolute; top: 30px; right: 30px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: #fff; padding: 12px 16px; border-radius: 50%; font-size: 20px; cursor: pointer; transition: var(--transition);"><i class="fa-solid fa-xmark"></i></button>
+        <h3 id="lightboxTitle" style="color: var(--neon-cyan); margin-bottom: 20px; font-family: var(--font-secondary); font-weight:700;">ID Proof Preview</h3>
+        <img id="lightboxImage" src="" style="max-width: 85%; max-height: 75%; border-radius: 12px; border: 2px solid rgba(255,255,255,0.1); box-shadow: 0 0 40px rgba(0,0,0,0.8); object-fit: contain;">
+    </div>
+
+    <!-- Product Details Modal Overlay -->
+    <div id="productDetailsModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(8, 11, 17, 0.85); backdrop-filter: blur(16px); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px;">
+        <div class="glass-panel glow-card" style="width: 100%; max-width: 650px; padding: 32px; position: relative; max-height: 90vh; overflow-y: auto;">
+            <button onclick="closeProductDetailsModal()" style="position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: #fff; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: var(--transition);"><i class="fa-solid fa-xmark"></i></button>
+            
+            <div style="display: flex; gap: 24px; margin-top: 10px; align-items: flex-start; flex-wrap: wrap;">
+                <div style="width: 200px; height: 200px; border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); flex-shrink: 0; background: #000; display: flex; align-items: center; justify-content: center;">
+                    <img id="detail-product-image" src="" style="width: 100%; height: 100%; object-fit: cover;">
+                </div>
+                <div style="flex: 1; min-width: 250px;">
+                    <span id="detail-product-cat" class="badge-cyan" style="font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; text-transform: uppercase;">CATEGORY</span>
+                    <h3 id="detail-product-name" style="font-size: 22px; font-weight: 800; color: #fff; margin: 8px 0 4px 0; font-family: var(--font-secondary);">Product Name</h3>
+                    <p id="detail-product-code" style="font-size: 11px; color: var(--text-muted); font-family: monospace;">CODE: MED-5000</p>
+                    <div style="margin: 12px 0; display: flex; align-items: baseline; gap: 8px;">
+                        <span id="detail-product-price" style="font-size: 24px; font-weight: 700; color: var(--neon-emerald);">$0.00</span>
+                        <span style="font-size: 12px; color: var(--text-muted)">per pack/unit</span>
+                    </div>
+                    <p id="detail-product-stock" style="font-size: 13px; color: var(--text-secondary); font-weight: 500;">Stock: 0 available</p>
+                </div>
+            </div>
+            
+            <div style="margin-top: 24px; border-top: 1px solid var(--border-color); padding-top: 20px;">
+                <h4 style="font-size: 13.5px; color: var(--neon-cyan); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;"><i class="fa-solid fa-file-medical"></i> Clinical Overview & Usage</h4>
+                <p id="detail-product-desc" style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 16px;">Detailed description of the clinical uses, dosages, and medical applications.</p>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; background: rgba(255,255,255,0.02); padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border-color); font-size: 12.5px; margin-bottom: 24px;">
+                    <div><span style="color: var(--text-muted)">Expiry Date:</span> <strong id="detail-product-expiry">YYYY-MM-DD</strong></div>
+                    <div><span style="color: var(--text-muted)">Manufacturer:</span> <strong id="detail-product-supplier">Supplier Name</strong></div>
+                    <div><span style="color: var(--text-muted)">Storage Location:</span> <strong id="detail-product-location">Location</strong></div>
+                    <div><span style="color: var(--text-muted)">Regulatory Status:</span> <strong style="color: var(--neon-emerald)"><i class="fa-solid fa-circle-check"></i> FDA Approved</strong></div>
+                </div>
+                
+                <div style="display: flex; gap: 16px; align-items: center; justify-content: flex-end;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 13px; color: var(--text-secondary);">Quantity:</span>
+                        <input type="number" id="detail-product-qty" value="1" min="1" class="product-qty-input" style="width: 60px; font-weight: 600;">
+                    </div>
+                    <button id="detail-product-buy-btn" class="btn btn-primary" style="padding: 12px 24px; display: inline-flex; align-items: center; gap: 8px; font-weight: 700;"><i class="fa-solid fa-cart-plus"></i> Add To Cart</button>
+                            <button id="detail-product-buy-btn" class="btn btn-primary" style="padding: 12px 24px; display: inline-flex; align-items: center; gap: 8px; font-weight: 700;"><i class="fa-solid fa-cart-plus"></i> Add To Cart</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Inventory Item Modal -->
+    <div id="addInventoryModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(8, 11, 17, 0.85); backdrop-filter: blur(16px); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px;">
+        <div class="glass-panel glow-card" style="width: 100%; max-width: 500px; padding: 32px; position: relative; max-height: 90vh; overflow-y: auto;">
+            <button onclick="closeAddInventoryModal()" style="position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: #fff; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;"><i class="fa-solid fa-xmark"></i></button>
+            <h3 style="font-size: 20px; font-weight: 800; color: #fff; margin-bottom: 20px; font-family: var(--font-secondary);"><i class="fa-solid fa-folder-plus"></i> Add New Product to Inventory</h3>
+            <form id="addInventoryForm" onsubmit="handleAddInventorySubmit(event)" style="display: flex; flex-direction: column; gap: 16px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label style="font-size: 11px;">Item Name *</label>
+                        <input type="text" id="add-inv-name" required placeholder="e.g. Paracetamol 500mg" style="padding:8px; font-size:12.5px;">
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label style="font-size: 11px;">Category *</label>
+                        <select id="add-inv-category" required style="padding:8px; font-size:12.5px;">
+                            <option value="Tablets">Tablets</option>
+                            <option value="Capsules">Capsules</option>
+                            <option value="Syrups">Syrups</option>
+                            <option value="Injections">Injections</option>
+                            <option value="Creams">Creams</option>
+                            <option value="Eye Drops">Eye Drops</option>
+                            <option value="Ear Drops">Ear Drops</option>
+                            <option value="Medical Equipment">Medical Equipment</option>
+                            <option value="Hospital Supplies">Hospital Supplies</option>
+                            <option value="Packages">Packages</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label style="font-size: 11px;">Initial Stock Qty *</label>
+                        <input type="number" id="add-inv-stock" required min="0" placeholder="e.g. 500" style="padding:8px; font-size:12.5px;">
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label style="font-size: 11px;">Reorder Threshold *</label>
+                        <input type="number" id="add-inv-reorder" required min="1" placeholder="e.g. 100" style="padding:8px; font-size:12.5px;">
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label style="font-size: 11px;">Unit Selling Price ($) *</label>
+                        <input type="number" step="0.01" id="add-inv-price" required min="0.01" placeholder="e.g. 0.45" style="padding:8px; font-size:12.5px;">
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label style="font-size: 11px;">Storage Shelf Location *</label>
+                        <input type="text" id="add-inv-location" required placeholder="e.g. Cabinet A, Warehouse" style="padding:8px; font-size:12.5px;">
+                    </div>
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label style="font-size: 11px;">Supplier / Manufacturer</label>
+                    <input type="text" id="add-inv-supplier" placeholder="e.g. PharmaLabs Corp" style="padding:8px; font-size:12.5px;">
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label style="font-size: 11px;">Expiry Date</label>
+                        <input type="date" id="add-inv-expiry" style="padding:8px; font-size:12.5px;">
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label style="font-size: 11px;">Product Catalog Image URL</label>
+                        <input type="url" id="add-inv-image" placeholder="https://images.unsplash.com/... (optional)" style="padding:8px; font-size:12.5px;">
+                    </div>
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label style="font-size: 11px;">Clinical Description & Directions</label>
+                    <textarea id="add-inv-desc" style="height: 60px; padding:8px; font-size:12.5px;" placeholder="Clinical uses, side effects, active chemical compounds..."></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary glow-btn" style="width: 100%; padding: 12px; margin-top: 8px; font-weight:700;"><i class="fa-solid fa-save"></i> Save Product to Inventory</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Adjust Inventory Stock Modal -->
+    <div id="adjustStockModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(8, 11, 17, 0.85); backdrop-filter: blur(16px); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px;">
+        <div class="glass-panel glow-card" style="width: 100%; max-width: 420px; padding: 32px; position: relative;">
+            <button onclick="closeAdjustStockModal()" style="position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: #fff; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;"><i class="fa-solid fa-xmark"></i></button>
+            <h3 style="font-size: 19px; font-weight: 800; color: #fff; margin-bottom: 20px; font-family: var(--font-secondary);"><i class="fa-solid fa-boxes-packing"></i> Adjust Inventory Levels</h3>
+            
+            <div style="display: flex; gap: 16px; margin-bottom: 20px; align-items: center;">
+                <img id="adjust-inv-img" src="" style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border-color);">
+                <div>
+                    <h4 id="adjust-inv-name" style="color: #fff; font-size: 15px; font-weight: 700; margin-bottom: 2px;">Item Name</h4>
+                    <span id="adjust-inv-code" style="font-family: monospace; font-size: 12px; color: var(--text-muted);">CODE: INV-5000</span>
+                </div>
+            </div>
+
+            <form id="adjustStockForm" onsubmit="handleAdjustStockSubmit(event)" style="display: flex; flex-direction: column; gap: 16px;">
+                <input type="hidden" id="adjust-inv-id">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label style="font-size: 11px;">Action Method</label>
+                    <select id="adjust-inv-action" onchange="handleAdjustActionChange()" style="font-weight: 600; padding:8px; font-size:12.5px;">
+                        <option value="add">Add Stock Units (Replenish)</option>
+                        <option value="sub">Subtract / Dispense Units</option>
+                        <option value="set">Over-Write Stock Level (Absolute)</option>
+                    </select>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label style="font-size: 11px;">Current Stock Level</label>
+                        <input type="number" id="adjust-inv-current" readonly style="background: rgba(0,0,0,0.25); color: var(--text-secondary); padding:8px; font-size:12.5px;">
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label id="adjust-qty-label" style="font-size: 11px;">Quantity to Add</label>
+                        <input type="number" id="adjust-inv-qty" required min="1" value="100" style="padding:8px; font-size:12.5px;">
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary glow-btn" style="width: 100%; padding: 12px; font-weight:700;"><i class="fa-solid fa-circle-check"></i> Commit Adjustment</button>
+            </form>
+        </div>
     </div>
 
     <!-- JavaScript Bundle -->

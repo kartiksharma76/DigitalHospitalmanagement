@@ -1485,3 +1485,170 @@ textarea {
     padding-bottom: 6px;
 }
 
+/* Auth View Panel background override */
+.auth-view-panel {
+    background-image: linear-gradient(135deg, rgba(8, 11, 17, 0.94) 0%, rgba(15, 23, 42, 0.9) 100%), url('../images/hospital_bg.png') !important;
+    background-size: cover !important;
+    background-position: center !important;
+    background-attachment: fixed !important;
+    min-height: 100vh;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow-y: auto;
+    padding: 40px 20px;
+}
+
+/* Make authentication layouts look premium and centered over the background */
+.auth-view-panel .login-wrapper {
+    min-height: auto;
+    width: 100%;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.auth-view-panel .login-card {
+    background: rgba(15, 23, 42, 0.75) !important;
+    backdrop-filter: blur(20px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 30px rgba(6, 182, 212, 0.1) !important;
+}
+
+/* Roster approval row animations and styling */
+.approval-main-row {
+    transition: var(--transition);
+}
+
+.approval-main-row:hover {
+    background: rgba(6, 182, 212, 0.05) !important;
+}
+
+.approval-details-row {
+    animation: slideDown 0.25s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Live Order Courier Tracker Timeline */
+.order-tracker-timeline {
+    position: relative;
+    margin: 20px 0;
+    padding-left: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.order-tracker-timeline::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 10px;
+    bottom: 10px;
+    width: 2px;
+    background: rgba(255, 255, 255, 0.08);
+    z-index: 1;
+}
+
+.timeline-step {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    z-index: 2;
+}
+
+.timeline-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #1e293b;
+    border: 2px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    color: var(--text-muted);
+    transition: all 0.3s ease;
+    margin-left: -32px; /* Pull into alignment with timeline line */
+}
+
+.timeline-info h5 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin: 0;
+    transition: all 0.3s ease;
+}
+
+.timeline-info p {
+    font-size: 11.5px;
+    color: var(--text-muted);
+    margin: 2px 0 0 0;
+}
+
+/* Active State */
+.timeline-step-active .timeline-icon {
+    background: rgba(6, 182, 212, 0.15);
+    border-color: var(--neon-cyan);
+    color: var(--neon-cyan);
+    box-shadow: 0 0 12px rgba(6, 182, 212, 0.4);
+}
+
+.timeline-step-active .timeline-info h5 {
+    color: var(--neon-cyan);
+}
+
+.timeline-step-active .timeline-info p {
+    color: var(--text-secondary);
+}
+
+/* Completed State */
+.timeline-step-completed .timeline-icon {
+    background: rgba(16, 185, 129, 0.15);
+    border-color: var(--neon-emerald);
+    color: var(--neon-emerald);
+}
+
+.timeline-step-completed .timeline-info h5 {
+    color: #fff;
+}
+
+.timeline-step-completed .timeline-info p {
+    color: var(--text-muted);
+}
+
+/* Upcoming State */
+.timeline-step-upcoming .timeline-icon {
+    background: #0f172a;
+    border-color: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.2);
+}
+
+/* Stock Progress Bar styling inside product card */
+.stock-progress-container {
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 6px 0;
+}
+
+.stock-progress-bar {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.4s ease;
+}

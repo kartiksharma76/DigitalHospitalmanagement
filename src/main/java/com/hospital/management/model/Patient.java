@@ -73,6 +73,11 @@ public class Patient {
     private String currentMedications;
     private String aadhaarNumber;
     private String panNumber;
+    private String idType;
+    private String idNumber;
+    @Lob
+    @Column(columnDefinition = "LONGTEXT")
+    private String idCardImage;
     private String insuranceCompany;
     private String insurancePolicyNumber;
     private String insuranceValidTill;
@@ -429,5 +434,29 @@ public class Patient {
 
     public void setUsername(String username) {
         this.username = username;
+    }
+
+    public String getIdType() {
+        return idType;
+    }
+
+    public void setIdType(String idType) {
+        this.idType = idType;
+    }
+
+    public String getIdNumber() {
+        return idNumber;
+    }
+
+    public void setIdNumber(String idNumber) {
+        this.idNumber = idNumber;
+    }
+
+    public String getIdCardImage() {
+        return idCardImage;
+    }
+
+    public void setIdCardImage(String idCardImage) {
+        this.idCardImage = idCardImage;
     }
 }

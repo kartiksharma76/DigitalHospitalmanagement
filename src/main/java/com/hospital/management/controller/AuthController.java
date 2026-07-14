@@ -141,8 +141,18 @@ public class AuthController {
         patient.setCurrentMedications((String) payload.get("currentMedications"));
 
         // Identity Proof
+        patient.setIdType((String) payload.get("idType"));
+        patient.setIdNumber((String) payload.get("idNumber"));
+        patient.setIdCardImage((String) payload.get("idCardImage"));
+
+        // Fallbacks for compatibility
         patient.setAadhaarNumber((String) payload.get("aadhaarNumber"));
         patient.setPanNumber((String) payload.get("panNumber"));
+        if ("Aadhaar Card".equalsIgnoreCase(patient.getIdType())) {
+            patient.setAadhaarNumber(patient.getIdNumber());
+        } else if ("PAN Card".equalsIgnoreCase(patient.getIdType())) {
+            patient.setPanNumber(patient.getIdNumber());
+        }
 
         // Insurance Details
         patient.setInsuranceCompany((String) payload.get("insuranceCompany"));
@@ -165,13 +175,31 @@ public class AuthController {
     @GetMapping("/pending-registrations")
     public ResponseEntity<?> getPendingRegistrations() {
         List<User> allUsers = userRepository.findAll();
-        List<User> pending = new ArrayList<>();
+        List<Map<String, Object>> pendingData = new ArrayList<>();
         for (User u : allUsers) {
             if ("PENDING".equals(u.getApprovalStatus())) {
-                pending.add(u);
+                Map<String, Object> map = new HashMap<>();
+                map.put("id", u.getId());
+                map.put("username", u.getUsername());
+                map.put("fullName", u.getFullName());
+                map.put("email", u.getEmail());
+                map.put("role", u.getRole());
+                map.put("approvalStatus", u.getApprovalStatus());
+                
+                // Find patient details
+                Optional<Patient> pOpt = patientRepository.findByUsername(u.getUsername());
+                if (pOpt.isPresent()) {
+                    Patient p = pOpt.get();
+                    map.put("idType", p.getIdType());
+                    map.put("idNumber", p.getIdNumber());
+                    map.put("idCardImage", p.getIdCardImage());
+                    map.put("aadhaarNumber", p.getAadhaarNumber());
+                    map.put("panNumber", p.getPanNumber());
+                }
+                pendingData.add(map);
             }
         }
-        return ResponseEntity.ok(pending);
+        return ResponseEntity.ok(pendingData);
     }
 
     @PostMapping("/approve-patient/{id}")

@@ -108,6 +108,7 @@ function navigate(panelId) {
         if (panelId === 'dashboard') loadDashboardData();
         if (panelId === 'patients') loadPatients();
         if (panelId === 'appointments') loadAppointments();
+        if (panelId === 'telemedicine') initTelemedicine();
         if (panelId === 'billing') loadBilling();
         if (panelId === 'inventory') loadInventory();
         if (panelId === 'compliance') loadAuditLogs();
@@ -586,6 +587,7 @@ function loadAppointmentActionPane(id) {
             </div>
             
             <div style="margin-top:20px; display:flex; flex-direction:column; gap:10px;">
+                ${appt.type === 'Telemedicine' ? `<button class="btn btn-primary" onclick="startTelemedicineSession(${appt.id})" style="background:linear-gradient(135deg, var(--neon-cyan), var(--neon-violet)); color:#fff; border:none; padding:12px; font-weight:700;"><i class="fa-solid fa-video"></i> Start Video Consultation</button>` : ''}
                 <button class="btn btn-primary" onclick="updateAppointmentStatus(${appt.id}, 'In_Queue')">Call Patient (Put In Queue)</button>
                 <button class="btn btn-secondary" style="color:var(--neon-emerald); border-color:rgba(16, 185, 129, 0.4)" onclick="updateAppointmentStatus(${appt.id}, 'Completed')">Mark Consultation Complete</button>
                 <button class="btn btn-secondary" style="color:var(--neon-rose); border-color:rgba(244, 63, 94, 0.4)" onclick="updateAppointmentStatus(${appt.id}, 'Cancelled')">Cancel Appointment</button>
@@ -1063,54 +1065,218 @@ async function saveInvoice(event) {
 // PHARMACY & INVENTORY MODULE
 // ==========================================================================
 
+let currentInventoryFilter = "All";
+let currentInventorySearch = "";
+
 async function loadInventory() {
     try {
         const res = await fetch("/api/inventory");
         if (res.ok) {
             cachedInventory = await res.json();
-            renderInventoryTable(cachedInventory);
+            renderInventoryItems();
         }
     } catch(e) {
         console.error(e);
     }
 }
 
-function renderInventoryTable(list) {
-    const tbody = document.querySelector("#inventoryTable tbody");
-    tbody.innerHTML = "";
+function handleInventorySearch() {
+    const input = document.getElementById("inventory-search-input");
+    if (input) {
+        currentInventorySearch = input.value.trim().toLowerCase();
+        renderInventoryItems();
+    }
+}
 
-    list.forEach(i => {
-        const isLow = i.stockQuantity <= i.reorderLevel;
-        const statusText = isLow ? `<span class="badge badge-danger">LOW STOCK</span>` : `<span class="badge badge-emerald">In Stock</span>`;
+function filterInventoryItems(category) {
+    currentInventoryFilter = category;
+    
+    // Toggle active classes on category buttons
+    const btns = document.querySelectorAll("#view-inventory button");
+    btns.forEach(btn => {
+        if (btn.textContent.trim() === category || (category === 'All' && btn.textContent.trim() === 'All Products') || (category === 'Medical Equipment' && btn.textContent.trim() === 'Equipment') || (category === 'Hospital Supplies' && btn.textContent.trim() === 'Supplies') || (category === 'Packages' && btn.textContent.trim() === 'Health Packages')) {
+            btn.classList.add("active-tab");
+        } else if (btn.onclick && btn.onclick.toString().includes("filterInventoryItems")) {
+            btn.classList.remove("active-tab");
+        }
+    });
 
-        tbody.innerHTML += `
-            <tr>
-                <td><strong>${i.itemCode}</strong></td>
-                <td>${i.name}</td>
-                <td>${i.category}</td>
-                <td>${i.stockQuantity} units</td>
-                <td>${i.reorderLevel} units</td>
-                <td>$${i.unitPrice.toFixed(2)}</td>
-                <td>${statusText}</td>
-                <td>
-                    <button class="btn btn-secondary btn-sm" onclick="showReplenishDialog(${i.id}, ${i.stockQuantity})">Replenish</button>
-                </td>
-            </tr>
+    renderInventoryItems();
+}
+
+function renderInventoryItems() {
+    const grid = document.getElementById("inventory-products-grid");
+    if (!grid) return;
+    grid.innerHTML = "";
+
+    const filtered = cachedInventory.filter(item => {
+        // Category check
+        const matchCategory = currentInventoryFilter === "All" ? true : item.category === currentInventoryFilter;
+
+        // Search check
+        const matchSearch = currentInventorySearch === "" ? true : 
+            (item.name.toLowerCase().includes(currentInventorySearch) || 
+             item.category.toLowerCase().includes(currentInventorySearch) || 
+             item.itemCode.toLowerCase().includes(currentInventorySearch));
+
+        return matchCategory && matchSearch;
+    });
+
+    if (filtered.length === 0) {
+        grid.innerHTML = `<div style="grid-column:1/-1; text-align:center; color:var(--text-muted); padding:32px 0;">No stock items found matching your filters.</div>`;
+        return;
+    }
+
+    filtered.forEach(item => {
+        const imgUrl = item.imageUrl ? item.imageUrl : "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400";
+        const isLow = item.stockQuantity <= item.reorderLevel;
+        const alertClass = isLow ? "color:var(--neon-rose); font-weight:700;" : "color:var(--neon-cyan);";
+        const progressPercent = Math.min(100, (item.stockQuantity / Math.max(1, item.reorderLevel * 2)) * 100);
+        const progressBg = isLow ? "var(--neon-rose)" : "var(--neon-cyan)";
+
+        grid.innerHTML += `
+            <div class="product-card" style="display:flex; flex-direction:column; justify-content:space-between; gap:12px;">
+                <div>
+                    <div style="width:100%; height:110px; border-radius:8px; overflow:hidden; border:1px solid var(--border-color); margin-bottom:8px; background:#000;">
+                        <img src="${imgUrl}" style="width:100%; height:100%; object-fit:cover;">
+                    </div>
+                    <span class="product-cat">${item.category}</span>
+                    <h4 class="product-name" style="margin:2px 0 4px 0; font-family:var(--font-secondary);">${item.name}</h4>
+                    <span style="font-family:monospace; font-size:11px; color:var(--text-muted);">CODE: ${item.itemCode}</span>
+                    
+                    <div style="margin:8px 0 4px 0;">
+                        <div style="display:flex; justify-content:space-between; font-size:11.5px; margin-bottom:2px;">
+                            <span style="color:var(--text-secondary);">Stock Level</span>
+                            <span style="${alertClass}">${item.stockQuantity} / ${item.reorderLevel} units</span>
+                        </div>
+                        <div class="stock-progress-container">
+                            <div class="stock-progress-bar" style="width:${progressPercent}%; background:${progressBg};"></div>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; font-size:12.5px; margin-bottom:8px;">
+                        <span style="color:var(--text-muted);">Unit Cost:</span>
+                        <span style="font-weight:700; color:var(--neon-emerald);">$${item.unitPrice.toFixed(2)}</span>
+                    </div>
+                    <div style="font-size:11.5px; color:var(--text-muted); line-height:1.4; margin-bottom:10px; border-top:1px solid rgba(255,255,255,0.03); padding-top:6px;">
+                        <div><i class="fa-solid fa-map-location-dot"></i> Shelf: <strong>${item.location || 'Warehouse'}</strong></div>
+                        <div><i class="fa-solid fa-building"></i> Lab: <strong>${item.supplierName || 'Licensed Lab'}</strong></div>
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <button class="btn btn-secondary btn-sm" onclick="showAdjustStockModal(${item.id})" style="flex:1; justify-content:center; padding:6px; font-size:11.5px;"><i class="fa-solid fa-boxes-packing"></i> Adjust</button>
+                        <button class="btn btn-secondary btn-sm" onclick="deleteInventoryItem(${item.id})" style="color:var(--neon-rose); border-color:rgba(244,63,94,0.3); padding:6px; font-size:11.5px;"><i class="fa-solid fa-trash-can"></i></button>
+                    </div>
+                </div>
+            </div>
         `;
     });
 }
 
-function showReplenishDialog(id, currentQty) {
-    const addQty = prompt("Enter stock units to add to inventory:", "100");
-    if (addQty === null) return;
+function showAddInventoryForm() {
+    const modal = document.getElementById("addInventoryModal");
+    if (modal) {
+        document.getElementById("addInventoryForm").reset();
+        modal.classList.remove("hidden");
+    }
+}
+
+function closeAddInventoryModal() {
+    const modal = document.getElementById("addInventoryModal");
+    if (modal) modal.classList.add("hidden");
+}
+
+async function handleAddInventorySubmit(event) {
+    event.preventDefault();
+    const payload = {
+        name: document.getElementById("add-inv-name").value.trim(),
+        category: document.getElementById("add-inv-category").value,
+        stockQuantity: parseInt(document.getElementById("add-inv-stock").value) || 0,
+        reorderLevel: parseInt(document.getElementById("add-inv-reorder").value) || 10,
+        unitPrice: parseFloat(document.getElementById("add-inv-price").value) || 1.00,
+        location: document.getElementById("add-inv-location").value.trim(),
+        supplierName: document.getElementById("add-inv-supplier").value.trim() || "Licensed Pharmaceutical Labs",
+        expiryDate: document.getElementById("add-inv-expiry").value || null,
+        imageUrl: document.getElementById("add-inv-image").value.trim() || null,
+        description: document.getElementById("add-inv-desc").value.trim() || null
+    };
+
+    closeAddInventoryModal();
+    saveInventoryItem(payload);
+}
+
+async function saveInventoryItem(payload) {
+    try {
+        const res = await fetch(`/api/inventory?requestedBy=${activeSession.username}&role=${activeSession.role}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+            loadInventory();
+        }
+    } catch(e) {
+        console.error(e);
+    }
+}
+
+function showAdjustStockModal(id) {
+    const item = cachedInventory.find(i => i.id === id);
+    if (!item) return;
+
+    const modal = document.getElementById("adjustStockModal");
+    if (!modal) return;
+
+    document.getElementById("adjust-inv-id").value = item.id;
+    document.getElementById("adjust-inv-name").innerText = item.name;
+    document.getElementById("adjust-inv-code").innerText = `CODE: ${item.itemCode}`;
+    document.getElementById("adjust-inv-current").value = item.stockQuantity;
+    document.getElementById("adjust-inv-qty").value = 50;
     
-    const qty = parseInt(addQty);
-    if (isNaN(qty) || qty <= 0) {
-        alert("Please enter a valid stock quantity count.");
-        return;
+    const img = document.getElementById("adjust-inv-img");
+    if (img) img.src = item.imageUrl ? item.imageUrl : "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=80";
+
+    handleAdjustActionChange();
+    modal.classList.remove("hidden");
+}
+
+function closeAdjustStockModal() {
+    const modal = document.getElementById("adjustStockModal");
+    if (modal) modal.classList.add("hidden");
+}
+
+function handleAdjustActionChange() {
+    const action = document.getElementById("adjust-inv-action").value;
+    const label = document.getElementById("adjust-qty-label");
+    if (!label) return;
+
+    if (action === "add") {
+        label.innerText = "Quantity to Add";
+    } else if (action === "sub") {
+        label.innerText = "Quantity to Deduct";
+    } else {
+        label.innerText = "New Absolute Quantity";
+    }
+}
+
+async function handleAdjustStockSubmit(event) {
+    event.preventDefault();
+    const id = parseInt(document.getElementById("adjust-inv-id").value);
+    const action = document.getElementById("adjust-inv-action").value;
+    const current = parseInt(document.getElementById("adjust-inv-current").value) || 0;
+    const qtyInput = parseInt(document.getElementById("adjust-inv-qty").value) || 0;
+
+    let targetQty = current;
+    if (action === "add") {
+        targetQty = current + qtyInput;
+    } else if (action === "sub") {
+        targetQty = Math.max(0, current - qtyInput);
+    } else {
+        targetQty = Math.max(0, qtyInput);
     }
 
-    updateStockQty(id, currentQty + qty);
+    closeAdjustStockModal();
+    updateStockQty(id, targetQty);
 }
 
 async function updateStockQty(id, qty) {
@@ -1126,38 +1292,16 @@ async function updateStockQty(id, qty) {
     }
 }
 
-function showAddInventoryForm() {
-    // Basic dialog populator
-    const item = prompt("Enter Item Name, Category, Stock Level, Reorder Threshold, Unit Price, Location separated by commas:\nExample: Penicillin G, Medicine, 250, 50, 1.25, Cabinet C");
-    if (!item) return;
-
-    const parts = item.split(",");
-    if (parts.length < 6) {
-        alert("All fields are required. Please input in comma-separated values format.");
-        return;
-    }
-
-    const payload = {
-        name: parts[0].trim(),
-        category: parts[1].trim(),
-        stockQuantity: parseInt(parts[2].trim()),
-        reorderLevel: parseInt(parts[3].trim()),
-        unitPrice: parseFloat(parts[4].trim()),
-        location: parts[5].trim()
-    };
-
-    saveInventoryItem(payload);
-}
-
-async function saveInventoryItem(payload) {
+async function deleteInventoryItem(id) {
+    if (!confirm("Are you sure you want to delete this product catalog item from the pharmacy inventory database?")) return;
     try {
-        const res = await fetch(`/api/inventory?requestedBy=${activeSession.username}&role=${activeSession.role}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
+        const res = await fetch(`/api/inventory/${id}?requestedBy=${activeSession.username}&role=${activeSession.role}`, {
+            method: "DELETE"
         });
         if (res.ok) {
             loadInventory();
+        } else {
+            alert("Delete action failed.");
         }
     } catch(e) {
         console.error(e);
@@ -1812,6 +1956,20 @@ function calculateSelfRegistrationAge() {
     }
 }
 
+// Base64 file reader helper
+function handleFileSelect(input, targetId) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const targetEl = document.getElementById(targetId);
+            if (targetEl) {
+                targetEl.value = e.target.result;
+            }
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
 // Patient Self Registration Submit
 async function handleSelfRegistration(event) {
     event.preventDefault();
@@ -1819,6 +1977,15 @@ async function handleSelfRegistration(event) {
     const succEl = document.getElementById("reg-success");
     errEl.classList.add("hidden");
     succEl.classList.add("hidden");
+
+    const idType = document.getElementById("self-id-type").value;
+    const idNumber = document.getElementById("self-id-number").value;
+    
+    // Set compatibility hidden fields
+    const aadhaarInput = document.getElementById("self-aadhaar");
+    const panInput = document.getElementById("self-pan");
+    if (aadhaarInput) aadhaarInput.value = (idType === "Aadhaar Card") ? idNumber : "";
+    if (panInput) panInput.value = (idType === "PAN Card") ? idNumber : "";
 
     const payload = {
         username: document.getElementById("self-username").value,
@@ -1844,8 +2011,11 @@ async function handleSelfRegistration(event) {
         chronicDiseases: document.getElementById("self-diseases").value,
         previousSurgeries: document.getElementById("self-surgeries").value,
         currentMedications: document.getElementById("self-medications").value,
-        aadhaarNumber: document.getElementById("self-aadhaar").value,
-        panNumber: document.getElementById("self-pan").value,
+        idType: idType,
+        idNumber: idNumber,
+        idCardImage: document.getElementById("self-id-card-image").value,
+        aadhaarNumber: (idType === "Aadhaar Card") ? idNumber : "",
+        panNumber: (idType === "PAN Card") ? idNumber : "",
         insuranceCompany: document.getElementById("self-insurance-company").value,
         insurancePolicyNumber: document.getElementById("self-insurance-policy").value,
         insuranceValidTill: document.getElementById("self-insurance-valid").value
@@ -2123,9 +2293,13 @@ async function loadPatientOrders() {
                 let badge = "badge-cyan";
                 if (o.status === "Delivered") badge = "badge-emerald";
                 else if (o.status === "Dispatched") badge = "badge-amber";
+                else if (o.status === "Out for Delivery") badge = "badge-cyan";
+                else if (o.status === "Packed") badge = "badge-violet";
+
+                const orderDataStr = JSON.stringify(o).replace(/'/g, "\\'").replace(/"/g, "&quot;");
 
                 tbody.innerHTML += `
-                    <tr>
+                    <tr onclick="showOrderTracking(${orderDataStr})" style="cursor:pointer;" class="approval-main-row">
                         <td><strong>#ORD-${o.id}</strong></td>
                         <td>${o.orderDate}</td>
                         <td>${o.items}</td>
@@ -2428,38 +2602,64 @@ async function loadPatientStore() {
     }
 }
 
+let currentStoreSearch = "";
+
+function handleStoreSearch() {
+    const input = document.getElementById("store-search-input");
+    if (input) {
+        currentStoreSearch = input.value.trim().toLowerCase();
+        renderStoreProducts();
+    }
+}
+
 function renderStoreProducts() {
     const grid = document.getElementById("store-products-grid");
     if (!grid) return;
     grid.innerHTML = "";
 
-    // Categories we want to filter
+    // Categories and Search filters
     const filtered = cachedInventory.filter(item => {
-        if (currentStoreFilter === 'All') {
-            return ["Tablets", "Capsules", "Syrups", "Injections", "Creams", "Eye Drops", "Ear Drops", "Medical Equipment", "Hospital Supplies", "Packages"].includes(item.category);
-        }
-        return item.category === currentStoreFilter;
+        // Category check
+        const matchCategory = currentStoreFilter === 'All' ? 
+            ["Tablets", "Capsules", "Syrups", "Injections", "Creams", "Eye Drops", "Ear Drops", "Medical Equipment", "Hospital Supplies", "Packages"].includes(item.category) : 
+            item.category === currentStoreFilter;
+
+        // Search check
+        const matchSearch = currentStoreSearch === "" ? true : 
+            (item.name.toLowerCase().includes(currentStoreSearch) || item.category.toLowerCase().includes(currentStoreSearch));
+
+        return matchCategory && matchSearch;
     });
 
     if (filtered.length === 0) {
-        grid.innerHTML = `<div style="grid-column:1/-1; text-align:center; color:var(--text-muted)">No items found in this category.</div>`;
+        grid.innerHTML = `<div style="grid-column:1/-1; text-align:center; color:var(--text-muted); padding:32px 0;">No medical products found matching your search.</div>`;
         return;
     }
 
     filtered.forEach(item => {
+        const imgUrl = item.imageUrl ? item.imageUrl : "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400";
+        const isOutOfStock = item.stockQuantity <= 0;
+        const buyButton = isOutOfStock ? 
+            `<button class="btn btn-secondary btn-sm" disabled style="flex:1;">Out of Stock</button>` : 
+            `<button class="btn btn-primary btn-sm" onclick="addItemToCart(${item.id})" style="flex:1;"><i class="fa-solid fa-cart-plus"></i> Buy</button>`;
+
         grid.innerHTML += `
-            <div class="product-card">
-                <div>
+            <div class="product-card" style="display:flex; flex-direction:column; justify-content:space-between; gap:16px;">
+                <div onclick="openProductDetailsModal(${item.id})" style="cursor:pointer;">
+                    <div style="width:100%; height:120px; border-radius:8px; overflow:hidden; border:1px solid var(--border-color); margin-bottom:12px; background:#000;">
+                        <img src="${imgUrl}" style="width:100%; height:100%; object-fit:cover; transition:transform 0.3s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                    </div>
                     <span class="product-cat">${item.category}</span>
-                    <h4 class="product-name" style="margin:4px 0 8px 0;">${item.name}</h4>
-                    <span class="product-price">$${item.unitPrice.toFixed(2)}</span>
+                    <h4 class="product-name" style="margin:4px 0 8px 0; font-family:var(--font-secondary);">${item.name}</h4>
+                    <span class="product-price" style="color:var(--neon-emerald); font-weight:700;">$${item.unitPrice.toFixed(2)}</span>
                 </div>
                 <div>
-                    <p class="product-stock" style="margin-bottom:8px;">Stock: ${item.stockQuantity} available</p>
-                    <div class="product-action">
-                        <input type="number" id="qty-${item.id}" value="1" min="1" max="${item.stockQuantity}" class="product-qty-input">
-                        <button class="btn btn-primary btn-sm" onclick="addItemToCart(${item.id})" style="flex:1;"><i class="fa-solid fa-cart-plus"></i> Buy</button>
+                    <p class="product-stock" style="margin-bottom:8px; font-size:12px;">Stock: ${item.stockQuantity} available</p>
+                    <div class="product-action" style="display:flex; gap:8px;">
+                        <input type="number" id="qty-${item.id}" value="1" min="1" max="${item.stockQuantity}" class="product-qty-input" style="width:50px;" ${isOutOfStock ? 'disabled' : ''}>
+                        ${buyButton}
                     </div>
+                    <button class="btn btn-secondary btn-sm" onclick="openProductDetailsModal(${item.id})" style="width:100%; margin-top:8px; justify-content:center; font-size:11px; padding:4px;"><i class="fa-solid fa-circle-info"></i> View Details</button>
                 </div>
             </div>
         `;
@@ -2482,31 +2682,41 @@ function filterStoreItems(category) {
     renderStoreProducts();
 }
 
-function addItemToCart(id) {
+function addItemToCart(id, qty = null) {
     const item = cachedInventory.find(i => i.id === id);
-    const qtyInput = document.getElementById(`qty-${id}`);
-    if (!item || !qtyInput) return;
+    if (!item) return;
 
-    const qty = parseInt(qtyInput.value) || 1;
-    if (qty > item.stockQuantity) {
-        alert("Requested quantity exceeds available inventory stock.");
+    let finalQty = 1;
+    if (qty !== null) {
+        finalQty = qty;
+    } else {
+        const qtyInput = document.getElementById(`qty-${id}`);
+        if (qtyInput) finalQty = parseInt(qtyInput.value) || 1;
+    }
+
+    if (finalQty > item.stockQuantity) {
+        alert(`Requested quantity exceeds available stock of ${item.stockQuantity}.`);
         return;
     }
 
     // Check if item already exists in cart
     const existing = cart.find(c => c.itemId === id);
     if (existing) {
-        existing.quantity += qty;
+        if (existing.quantity + finalQty > item.stockQuantity) {
+            alert(`Cannot add more. Total cart quantity would exceed available stock.`);
+            return;
+        }
+        existing.quantity += finalQty;
     } else {
         cart.push({
             itemId: id,
             name: item.name,
             price: item.unitPrice,
-            quantity: qty
+            quantity: finalQty
         });
     }
 
-    alert(`Added ${qty} x ${item.name} to shopping cart.`);
+    alert(`Added ${finalQty} x ${item.name} to shopping cart.`);
     renderCart();
 }
 
@@ -2526,18 +2736,57 @@ function renderCart() {
     cart.forEach((c, idx) => {
         const itemTotal = c.price * c.quantity;
         total += itemTotal;
+
+        const invItem = cachedInventory.find(i => i.id === c.itemId);
+        const imgUrl = (invItem && invItem.imageUrl) ? invItem.imageUrl : "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=80";
+
         list.innerHTML += `
-            <div class="cart-item">
-                <div class="cart-item-info">
-                    <span class="cart-item-name">${c.name} (x${c.quantity})</span>
-                    <span class="cart-item-price">$${itemTotal.toFixed(2)}</span>
+            <div class="cart-item" style="display:flex; align-items:center; gap:10px; padding:10px; background:rgba(255,255,255,0.02); border:1px solid var(--border-color); border-radius:8px;">
+                <img src="${imgUrl}" style="width:40px; height:40px; object-fit:cover; border-radius:6px; border:1px solid var(--border-color);">
+                <div class="cart-item-info" style="flex:1; display:flex; flex-direction:column; gap:2px; font-size:12.5px;">
+                    <span class="cart-item-name" style="font-weight:600; color:#fff;">${c.name}</span>
+                    <span class="cart-item-price" style="color:var(--neon-emerald);">$${itemTotal.toFixed(2)}</span>
                 </div>
-                <button class="cart-item-remove" onclick="removeCartItem(${idx})"><i class="fa-solid fa-trash-can"></i></button>
+                <div style="display:flex; align-items:center; gap:6px;">
+                    <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:10px;" onclick="updateCartItemQuantity(${idx}, -1)">-</button>
+                    <span style="font-size:13px; font-weight:600; min-width:14px; text-align:center;">${c.quantity}</span>
+                    <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:10px;" onclick="updateCartItemQuantity(${idx}, 1)">+</button>
+                </div>
+                <button class="cart-item-remove" style="color:var(--neon-rose); background:none; border:none; cursor:pointer;" onclick="removeCartItem(${idx})"><i class="fa-solid fa-trash-can"></i></button>
             </div>
         `;
     });
 
+    list.insertAdjacentHTML('afterbegin', `
+        <div style="text-align:right; margin-bottom:8px;">
+            <button class="btn btn-secondary btn-sm" onclick="clearCart()" style="font-size:11px; padding:4px 8px; color:var(--neon-rose); border-color:rgba(244,63,94,0.3);"><i class="fa-solid fa-circle-xmark"></i> Clear Cart</button>
+        </div>
+    `);
+
     totalEl.textContent = `$${total.toFixed(2)}`;
+}
+
+function updateCartItemQuantity(index, delta) {
+    const c = cart[index];
+    if (!c) return;
+
+    const item = cachedInventory.find(i => i.id === c.itemId);
+    const maxStock = item ? item.stockQuantity : 999;
+
+    const newQty = c.quantity + delta;
+    if (newQty <= 0) {
+        removeCartItem(index);
+    } else if (newQty > maxStock) {
+        alert(`Requested quantity exceeds available stock of ${maxStock}`);
+    } else {
+        c.quantity = newQty;
+        renderCart();
+    }
+}
+
+function clearCart() {
+    cart = [];
+    renderCart();
 }
 
 function removeCartItem(index) {
@@ -2602,18 +2851,41 @@ async function loadUserApprovals() {
                 return;
             }
             users.forEach(u => {
+                const idImageHtml = u.idCardImage ? `
+                    <div style="margin-top: 10px;">
+                        <span style="display:block; font-size:11px; color:var(--text-muted); margin-bottom:4px;">ID Proof Image:</span>
+                        <img src="${u.idCardImage}" style="max-width: 200px; max-height: 120px; border-radius: 8px; border: 1px solid var(--border-color); cursor: pointer;" onclick="openImageModal('${u.idCardImage}', '${u.idType || 'ID'} Proof Preview')" title="Click to enlarge">
+                    </div>
+                ` : `<span style="font-size:11px; color:var(--text-muted)">No ID Image uploaded</span>`;
+
                 tbody.innerHTML += `
-                    <tr>
+                    <tr class="approval-main-row" onclick="toggleApprovalDetail(${u.id})" style="cursor:pointer;">
                         <td><strong>${u.id}</strong></td>
-                        <td>${u.username}</td>
+                        <td>${u.username} <i class="fa-solid fa-chevron-down" id="chevron-${u.id}" style="font-size:10px; margin-left:6px; color:var(--text-muted)"></i></td>
                         <td>${u.fullName}</td>
                         <td>${u.email}</td>
                         <td><span class="badge badge-secondary">${u.role}</span></td>
                         <td><span class="badge badge-amber">${u.approvalStatus}</span></td>
                         <td>
-                            <div style="display:flex; gap:6px;">
+                            <div style="display:flex; gap:6px;" onclick="event.stopPropagation();">
                                 <button class="btn btn-primary btn-sm" style="background:var(--neon-emerald); border-color:var(--neon-emerald)" onclick="approveUser(${u.id})">Approve</button>
                                 <button class="btn btn-secondary btn-sm" style="color:var(--neon-rose); border-color:rgba(244,63,94,0.4)" onclick="rejectUser(${u.id})">Reject</button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr id="details-row-${u.id}" class="approval-details-row hidden" style="background: rgba(255,255,255,0.015);">
+                        <td colspan="7" style="padding: 16px 24px; border-bottom: 1px solid var(--border-color);">
+                            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:20px;">
+                                <div style="flex:1.2; line-height: 1.8;">
+                                    <h4 style="font-size:13.5px; color:var(--neon-cyan); margin-bottom:8px;"><i class="fa-solid fa-id-card"></i> Patient Identification Ledger</h4>
+                                    <p style="margin: 4px 0;">Selected Identity Type: <strong>${u.idType || 'Not specified'}</strong></p>
+                                    <p style="margin: 4px 0;">Identity Card Number: <span style="font-family:monospace; background:rgba(255,255,255,0.05); padding:2px 6px; border-radius:4px; font-weight:600;">${u.idNumber || 'N/A'}</span></p>
+                                    <p style="margin: 4px 0;">Aadhaar Number (fallback): <strong>${u.aadhaarNumber || 'N/A'}</strong></p>
+                                    <p style="margin: 4px 0;">PAN Card (fallback): <strong>${u.panNumber || 'N/A'}</strong></p>
+                                </div>
+                                <div style="flex:1; text-align:right;">
+                                    ${idImageHtml}
+                                </div>
                             </div>
                         </td>
                     </tr>
@@ -2667,6 +2939,23 @@ async function loadAdminOrders() {
                 let badge = "badge-cyan";
                 if (o.status === "Delivered") badge = "badge-emerald";
                 else if (o.status === "Dispatched") badge = "badge-amber";
+                else if (o.status === "Out for Delivery") badge = "badge-cyan";
+                else if (o.status === "Packed") badge = "badge-violet";
+
+                let actionBtnHtml = "";
+                if (o.status === "Pending") {
+                    actionBtnHtml = `<button class="btn btn-primary btn-sm" onclick="updateAdminOrderStatus(${o.id}, 'Packed')" style="background:var(--neon-violet); border-color:var(--neon-violet); font-size:11.5px; padding:6px 12px; display:inline-flex; align-items:center; gap:6px;"><i class="fa-solid fa-box"></i> Pack Order</button>`;
+                } else if (o.status === "Packed") {
+                    actionBtnHtml = `<button class="btn btn-primary btn-sm" onclick="updateAdminOrderStatus(${o.id}, 'Dispatched')" style="background:var(--neon-amber); border-color:var(--neon-amber); font-size:11.5px; padding:6px 12px; color:#000; display:inline-flex; align-items:center; gap:6px;"><i class="fa-solid fa-truck-fast"></i> Ship / Dispatch</button>`;
+                } else if (o.status === "Dispatched") {
+                    actionBtnHtml = `<button class="btn btn-primary btn-sm" onclick="updateAdminOrderStatus(${o.id}, 'Out for Delivery')" style="background:var(--neon-cyan); border-color:var(--neon-cyan); font-size:11.5px; padding:6px 12px; color:#000; display:inline-flex; align-items:center; gap:6px;"><i class="fa-solid fa-people-carry-box"></i> Out for Delivery</button>`;
+                } else if (o.status === "Out for Delivery") {
+                    actionBtnHtml = `<button class="btn btn-primary btn-sm" onclick="updateAdminOrderStatus(${o.id}, 'Delivered')" style="background:var(--neon-emerald); border-color:var(--neon-emerald); font-size:11.5px; padding:6px 12px; color:#000; display:inline-flex; align-items:center; gap:6px;"><i class="fa-solid fa-house-chimney-medical"></i> Mark Delivered</button>`;
+                } else if (o.status === "Delivered") {
+                    actionBtnHtml = `<span style="color:var(--neon-emerald); font-weight:700; font-size:12.5px; display:inline-flex; align-items:center; gap:4px;"><i class="fa-solid fa-circle-check"></i> Fulfilled</span>`;
+                } else {
+                    actionBtnHtml = `<span style="color:var(--text-muted); font-size:12px;">No Actions</span>`;
+                }
 
                 tbody.innerHTML += `
                     <tr>
@@ -2677,13 +2966,7 @@ async function loadAdminOrders() {
                         <td>$${o.totalAmount.toFixed(2)}</td>
                         <td><span class="badge ${badge}">${o.status}</span></td>
                         <td style="font-size:12px; max-width:180px; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${o.deliveryAddress}</td>
-                        <td>
-                            <select onchange="updateAdminOrderStatus(${o.id}, this.value)" style="font-size:12px; padding:4px;">
-                                <option value="Pending" ${o.status === 'Pending' ? 'selected' : ''}>Pending</option>
-                                <option value="Dispatched" ${o.status === 'Dispatched' ? 'selected' : ''}>Dispatched</option>
-                                <option value="Delivered" ${o.status === 'Delivered' ? 'selected' : ''}>Delivered</option>
-                            </select>
-                        </td>
+                        <td>${actionBtnHtml}</td>
                     </tr>
                 `;
             });
@@ -2753,5 +3036,495 @@ async function dischargeAdminBed(id) {
             loadAdminBedBookings();
         }
     } catch(e) { console.error(e); }
+}
+
+// Expandable approval details helper
+function toggleApprovalDetail(id) {
+    const detailsRow = document.getElementById(`details-row-${id}`);
+    const chevron = document.getElementById(`chevron-${id}`);
+    if (detailsRow) {
+        detailsRow.classList.toggle("hidden");
+        if (chevron) {
+            if (detailsRow.classList.contains("hidden")) {
+                chevron.className = "fa-solid fa-chevron-down";
+            } else {
+                chevron.className = "fa-solid fa-chevron-up";
+            }
+        }
+    }
+}
+
+// Lightbox modal helpers
+function openImageModal(src, title) {
+    const modal = document.getElementById("imageLightboxModal");
+    const img = document.getElementById("lightboxImage");
+    const titleEl = document.getElementById("lightboxTitle");
+    if (modal && img) {
+        img.src = src;
+        if (titleEl) titleEl.innerText = title;
+        modal.classList.remove("hidden");
+    }
+}
+
+function closeLightboxModal() {
+    const modal = document.getElementById("imageLightboxModal");
+    if (modal) {
+        modal.classList.add("hidden");
+    }
+}
+
+// Product Details & E-Commerce helper functions
+function openProductDetailsModal(itemId) {
+    const item = cachedInventory.find(i => i.id === itemId);
+    if (!item) return;
+
+    const modal = document.getElementById("productDetailsModal");
+    const img = document.getElementById("detail-product-image");
+    const cat = document.getElementById("detail-product-cat");
+    const name = document.getElementById("detail-product-name");
+    const code = document.getElementById("detail-product-code");
+    const price = document.getElementById("detail-product-price");
+    const stock = document.getElementById("detail-product-stock");
+    const desc = document.getElementById("detail-product-desc");
+    const expiry = document.getElementById("detail-product-expiry");
+    const supplier = document.getElementById("detail-product-supplier");
+    const location = document.getElementById("detail-product-location");
+    const qtyInput = document.getElementById("detail-product-qty");
+    const buyBtn = document.getElementById("detail-product-buy-btn");
+
+    if (!modal) return;
+
+    if (img) img.src = item.imageUrl ? item.imageUrl : "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400";
+    if (cat) cat.innerText = item.category;
+    if (name) name.innerText = item.name;
+    if (code) code.innerText = `PRODUCT CODE: ${item.itemCode || 'MED-' + item.id}`;
+    if (price) price.innerText = `$${item.unitPrice.toFixed(2)}`;
+    if (stock) stock.innerText = `Stock Level: ${item.stockQuantity} available on shelves`;
+    if (desc) desc.innerText = item.description ? item.description : "Clinical uses, dosage guidelines, and medical specifications for this item.";
+    if (expiry) expiry.innerText = item.expiryDate || "N/A";
+    if (supplier) supplier.innerText = item.supplierName || "Licensed Pharmaceutical Labs";
+    if (location) location.innerText = item.location || "Pharmacy Dispensary";
+
+    if (qtyInput) {
+        qtyInput.value = 1;
+        qtyInput.max = item.stockQuantity;
+        qtyInput.disabled = item.stockQuantity <= 0;
+    }
+
+    if (buyBtn) {
+        if (item.stockQuantity <= 0) {
+            buyBtn.innerText = "Out of Stock";
+            buyBtn.disabled = true;
+            buyBtn.onclick = null;
+        } else {
+            buyBtn.innerHTML = `<i class="fa-solid fa-cart-plus"></i> Add To Cart`;
+            buyBtn.disabled = false;
+            buyBtn.onclick = function() {
+                const qtyVal = parseInt(qtyInput.value) || 1;
+                addItemToCart(item.id, qtyVal);
+                closeProductDetailsModal();
+            };
+        }
+    }
+
+    modal.classList.remove("hidden");
+}
+
+function closeProductDetailsModal() {
+    const modal = document.getElementById("productDetailsModal");
+    if (modal) {
+        modal.classList.add("hidden");
+    }
+}
+
+function showOrderTracking(order) {
+    const container = document.getElementById("patient-order-tracker-container");
+    const timelineEl = document.getElementById("patient-order-timeline");
+    if (!container || !timelineEl) return;
+
+    container.classList.remove("hidden");
+    timelineEl.innerHTML = "";
+
+    const stages = ["Pending", "Packed", "Dispatched", "Out for Delivery", "Delivered"];
+    const stageLabels = {
+        "Pending": "Order Placed",
+        "Packed": "Packed & Verified",
+        "Dispatched": "Dispatched",
+        "Out for Delivery": "Out for Delivery",
+        "Delivered": "Delivered"
+    };
+
+    let currentIdx = stages.indexOf(order.status);
+    if (currentIdx === -1) {
+        if (order.status.toLowerCase().includes("pending") || order.status.toLowerCase().includes("placed")) currentIdx = 0;
+        else if (order.status.toLowerCase().includes("delivered")) currentIdx = 4;
+        else if (order.status.toLowerCase().includes("dispatched")) currentIdx = 2;
+        else if (order.status.toLowerCase().includes("packed")) currentIdx = 1;
+        else if (order.status.toLowerCase().includes("out for delivery") || order.status.toLowerCase().includes("delivery")) currentIdx = 3;
+        else currentIdx = 0;
+    }
+
+    stages.forEach((stage, idx) => {
+        let statusClass = "timeline-step-upcoming";
+        if (idx < currentIdx) {
+            statusClass = "timeline-step-completed";
+        } else if (idx === currentIdx) {
+            statusClass = "timeline-step-active";
+        }
+
+        let icon = "fa-circle-check";
+        if (stage === "Pending") icon = "fa-receipt";
+        else if (stage === "Packed") icon = "fa-box-open";
+        else if (stage === "Dispatched") icon = "fa-truck-fast";
+        else if (stage === "Out for Delivery") icon = "fa-people-carry-box";
+        else if (stage === "Delivered") icon = "fa-house-chimney-medical";
+
+        timelineEl.innerHTML += `
+            <div class="timeline-step ${statusClass}">
+                <div class="timeline-icon"><i class="fa-solid ${icon}"></i></div>
+                <div class="timeline-info">
+                    <h5>${stageLabels[stage]}</h5>
+                    <p>${idx < currentIdx ? "Completed" : (idx === currentIdx ? "Current Status" : "Pending dispatch")}</p>
+                </div>
+            </div>
+        `;
+    });
+}
+
+// ==========================================================================
+// TELEMEDICINE INTERACTIVE CORE RENDERER
+// ==========================================================================
+let telemedLocalStream = null;
+let telemedCanvasInterval = null;
+let telemedActivePatient = "Elena Rostova";
+let telemedMicMuted = false;
+let telemedVideoMuted = false;
+
+function initTelemedicine(patientName = null) {
+    if (patientName) {
+        telemedActivePatient = patientName;
+    } else {
+        // Fallback: look for a scheduled telemedicine appointment to get its patient name!
+        const teleAppt = cachedAppointments ? cachedAppointments.find(a => a.type === 'Telemedicine' && a.status !== 'Completed') : null;
+        if (teleAppt) {
+            telemedActivePatient = `${teleAppt.patient.firstName} ${teleAppt.patient.lastName}`;
+        } else {
+            telemedActivePatient = "Elena Rostova (Remote Patient)";
+        }
+    }
+
+    // Set UI labels
+    const pLabel = document.getElementById("telemed-patient-label");
+    if (pLabel) pLabel.innerText = `Remote Patient (${telemedActivePatient})`;
+
+    // Reset controls UI
+    telemedMicMuted = false;
+    telemedVideoMuted = false;
+    
+    const micBtn = document.getElementById("telemed-mic-btn");
+    const vidBtn = document.getElementById("telemed-video-btn");
+    if (micBtn) {
+        micBtn.innerHTML = `<i class="fa-solid fa-microphone"></i>`;
+        micBtn.style.background = "rgba(255,255,255,0.15)";
+    }
+    if (vidBtn) {
+        vidBtn.innerHTML = `<i class="fa-solid fa-video"></i>`;
+        vidBtn.style.background = "rgba(255,255,255,0.15)";
+    }
+
+    // 1. Launch local doctor stream (webcam)
+    startLocalWebcam();
+
+    // 2. Launch remote patient diagnostic simulation stream
+    startRemoteSimulation();
+}
+
+function startTelemedicineSession(apptId) {
+    const appt = cachedAppointments.find(a => a.id === apptId);
+    if (appt) {
+        const patientName = `${appt.patient.firstName} ${appt.patient.lastName}`;
+        // Populate notes template with patient details
+        const notes = document.getElementById("telemed-clinical-notes");
+        if (notes) {
+            notes.value = `CONSULTATION RECORD\nPatient Name: ${patientName}\nDate: ${appt.date}\nDiagnosis:\nPrescription:\n`;
+        }
+        initTelemedicine(patientName);
+        navigate('telemedicine');
+    }
+}
+
+async function startLocalWebcam() {
+    const localVideo = document.getElementById("telemed-local-video");
+    const localPlaceholder = document.getElementById("telemed-local-placeholder");
+    
+    if (!localVideo) return;
+
+    // Stop existing stream tracks
+    if (telemedLocalStream) {
+        telemedLocalStream.getTracks().forEach(track => track.stop());
+    }
+
+    try {
+        // Access webcam
+        telemedLocalStream = await navigator.mediaDevices.getUserMedia({
+            video: { width: 320, height: 240, facingMode: "user" },
+            audio: true
+        });
+        
+        localVideo.srcObject = telemedLocalStream;
+        localVideo.style.display = "block";
+        if (localPlaceholder) localPlaceholder.style.display = "none";
+    } catch (e) {
+        console.warn("Webcam access denied or unavailable. Fallback to placeholder simulator.", e);
+        localVideo.style.display = "none";
+        if (localPlaceholder) {
+            localPlaceholder.style.display = "flex";
+            localPlaceholder.querySelector("span").innerText = "Camera Unavailable";
+        }
+    }
+}
+
+function startRemoteSimulation() {
+    const canvas = document.getElementById("telemed-remote-canvas");
+    const placeholder = document.getElementById("telemed-remote-placeholder");
+    
+    if (!canvas) return;
+    
+    canvas.style.display = "block";
+    if (placeholder) placeholder.style.display = "none";
+
+    const ctx = canvas.getContext("2d");
+    
+    // Clear any active interval loop
+    if (telemedCanvasInterval) clearInterval(telemedCanvasInterval);
+
+    // ECG wave parameters
+    let ecgX = 0;
+    const points = [];
+    const maxPoints = 200;
+    
+    // Heart rate mock variables
+    let currentBpm = 74;
+    let nextBpmUpdate = 0;
+
+    // Circular HUD scan parameter
+    let radarAngle = 0;
+
+    telemedCanvasInterval = setInterval(() => {
+        if (!canvas.width || canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
+            canvas.width = canvas.clientWidth || 400;
+            canvas.height = canvas.clientHeight || 300;
+        }
+
+        const w = canvas.width;
+        const h = canvas.height;
+
+        // Clear with clean dark grid background
+        ctx.fillStyle = "#080b11";
+        ctx.fillRect(0, 0, w, h);
+
+        // Draw grid lines
+        ctx.strokeStyle = "rgba(6, 182, 212, 0.05)";
+        ctx.lineWidth = 1;
+        const gridSize = 20;
+        for (let x = 0; x < w; x += gridSize) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, h);
+            ctx.stroke();
+        }
+        for (let y = 0; y < h; y += gridSize) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(w, y);
+            ctx.stroke();
+        }
+
+        // Draw HUD target circles in center
+        const cx = w / 2;
+        const cy = h / 2 - 20;
+        
+        ctx.strokeStyle = "rgba(139, 92, 246, 0.25)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 70, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.strokeStyle = "rgba(6, 182, 212, 0.15)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 100, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Crosshairs
+        ctx.beginPath();
+        ctx.moveTo(cx - 120, cy); ctx.lineTo(cx - 80, cy);
+        ctx.moveTo(cx + 80, cy); ctx.lineTo(cx + 120, cy);
+        ctx.moveTo(cx, cy - 120); ctx.lineTo(cx, cy - 80);
+        ctx.moveTo(cx, cy + 80); ctx.lineTo(cx, cy + 120);
+        ctx.stroke();
+
+        // Draw rotating scanner line
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(radarAngle);
+        ctx.strokeStyle = "rgba(139, 92, 246, 0.15)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(100, 0);
+        ctx.stroke();
+        ctx.restore();
+        radarAngle += 0.02;
+
+        // Draw mock patient silhouette or face scan points
+        ctx.fillStyle = "rgba(139, 92, 246, 0.5)";
+        ctx.beginPath();
+        ctx.arc(cx, cy - 20, 24, 0, Math.PI * 2); // Head
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.ellipse(cx, cy + 40, 44, 28, 0, 0, Math.PI * 2); // Shoulders
+        ctx.fill();
+
+        // Draw scanning HUD ticks/dots
+        ctx.fillStyle = "rgba(6, 182, 212, 0.8)";
+        ctx.font = "bold 9px monospace";
+        ctx.fillText("FACIAL SCAN: ACTIVE", cx - 50, cy - 55);
+        ctx.fillText("SECURE P2P LINK", cx - 44, cy + 85);
+
+        // Fluctuating BPM
+        if (Date.now() > nextBpmUpdate) {
+            currentBpm = Math.floor(70 + Math.random() * 8);
+            nextBpmUpdate = Date.now() + 1500;
+        }
+
+        // Draw ECG curve at bottom
+        const ecgYCenter = h - 50;
+        const speed = 2.5;
+        
+        // Generate next ECG amplitude value
+        let val = 0;
+        const step = Math.floor(ecgX) % 60;
+        if (step === 10) val = -8; // P wave
+        else if (step === 18) val = 4;   // Q wave
+        else if (step === 20) val = -38;  // R spike
+        else if (step === 22) val = 15;   // S wave
+        else if (step === 28) val = -5;   // T wave
+        
+        // Add random micro-tremble
+        val += (Math.random() - 0.5) * 2;
+        
+        points.push(val);
+        if (points.length > maxPoints) points.shift();
+        
+        ctx.strokeStyle = "rgba(16, 185, 129, 0.85)";
+        ctx.lineWidth = 2;
+        ctx.shadowBlur = 4;
+        ctx.shadowColor = "rgba(16, 185, 129, 0.5)";
+        ctx.beginPath();
+        
+        const startX = w - points.length * speed;
+        for (let i = 0; i < points.length; i++) {
+            const px = startX + i * speed;
+            const py = ecgYCenter + points[i];
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+        ctx.shadowBlur = 0; // Reset shadow
+
+        ecgX += 1;
+
+        // Overlay status text
+        ctx.fillStyle = "#fff";
+        ctx.font = "12px sans-serif";
+        ctx.fillText(`HR: ${currentBpm} BPM`, 20, 30);
+        ctx.fillStyle = "var(--neon-emerald)";
+        ctx.fillText("SIGNAL: 1080P STABLE", 20, 50);
+
+        ctx.fillStyle = "rgba(255,255,255,0.4)";
+        ctx.font = "11px monospace";
+        ctx.fillText("ENCRYPTED END-TO-END (AES-256)", w - 210, 30);
+        ctx.fillText(" Aura simulated stream ", w - 165, h - 15);
+    }, 33);
+}
+
+function toggleTelemedMic() {
+    if (!telemedLocalStream) return;
+    const audioTrack = telemedLocalStream.getAudioTracks()[0];
+    const micBtn = document.getElementById("telemed-mic-btn");
+    
+    if (audioTrack) {
+        telemedMicMuted = !telemedMicMuted;
+        audioTrack.enabled = !telemedMicMuted;
+        
+        if (telemedMicMuted) {
+            micBtn.innerHTML = `<i class="fa-solid fa-microphone-slash"></i>`;
+            micBtn.style.background = "var(--neon-rose)";
+        } else {
+            micBtn.innerHTML = `<i class="fa-solid fa-microphone"></i>`;
+            micBtn.style.background = "rgba(255,255,255,0.15)";
+        }
+    }
+}
+
+function toggleTelemedVideo() {
+    if (!telemedLocalStream) return;
+    const videoTrack = telemedLocalStream.getVideoTracks()[0];
+    const vidBtn = document.getElementById("telemed-video-btn");
+    const localVideo = document.getElementById("telemed-local-video");
+    const localPlaceholder = document.getElementById("telemed-local-placeholder");
+    
+    if (videoTrack) {
+        telemedVideoMuted = !telemedVideoMuted;
+        videoTrack.enabled = !telemedVideoMuted;
+        
+        if (telemedVideoMuted) {
+            vidBtn.innerHTML = `<i class="fa-solid fa-video-slash"></i>`;
+            vidBtn.style.background = "var(--neon-rose)";
+            localVideo.style.display = "none";
+            if (localPlaceholder) {
+                localPlaceholder.style.display = "flex";
+                localPlaceholder.querySelector("span").innerText = "Camera Muted";
+            }
+        } else {
+            vidBtn.innerHTML = `<i class="fa-solid fa-video"></i>`;
+            vidBtn.style.background = "rgba(255,255,255,0.15)";
+            localVideo.style.display = "block";
+            if (localPlaceholder) localPlaceholder.style.display = "none";
+        }
+    }
+}
+
+function hangupTelemed() {
+    // 1. Stop local webcam stream
+    if (telemedLocalStream) {
+        telemedLocalStream.getTracks().forEach(track => track.stop());
+        telemedLocalStream = null;
+    }
+    
+    // 2. Stop Canvas ECG loop
+    if (telemedCanvasInterval) {
+        clearInterval(telemedCanvasInterval);
+        telemedCanvasInterval = null;
+    }
+    
+    // Hide feeds
+    const localVideo = document.getElementById("telemed-local-video");
+    const localPlaceholder = document.getElementById("telemed-local-placeholder");
+    const canvas = document.getElementById("telemed-remote-canvas");
+    const placeholder = document.getElementById("telemed-remote-placeholder");
+    
+    if (localVideo) localVideo.style.display = "none";
+    if (localPlaceholder) {
+        localPlaceholder.style.display = "flex";
+        localPlaceholder.querySelector("span").innerText = "Camera is Off";
+    }
+    if (canvas) canvas.style.display = "none";
+    if (placeholder) placeholder.style.display = "flex";
+
+    alert("Telemedicine consult call hung up successfully.");
+    navigate('appointments');
 }
 
