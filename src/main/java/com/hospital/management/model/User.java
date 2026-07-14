@@ -28,6 +28,9 @@ public class User {
     @Column(nullable = false)
     private boolean active = true;
 
+    @Column(nullable = false)
+    private String approvalStatus = "APPROVED"; // PENDING, APPROVED, REJECTED
+
     // Constructors
     public User() {
     }
@@ -96,5 +99,13 @@ public class User {
 
     public void setActive(boolean active) {
         this.active = active;
+    }
+
+    public String getApprovalStatus() {
+        return approvalStatus;
+    }
+
+    public void setApprovalStatus(String approvalStatus) {
+        this.approvalStatus = approvalStatus;
     }
 }

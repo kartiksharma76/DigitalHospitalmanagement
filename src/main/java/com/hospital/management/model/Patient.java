@@ -55,6 +55,29 @@ public class Patient {
     private boolean seniorCitizenCare = false;
     private String childGrowthPercentile; // e.g. "90th percentile"
 
+    private Integer age;
+    @Lob
+    @Column(columnDefinition = "LONGTEXT")
+    private String profilePhoto;
+    private String addressHouseNumber;
+    private String addressStreet;
+    private String addressCity;
+    private String addressState;
+    private String addressPincode;
+    private String emergencyRelation;
+    private Double height;
+    private Double weight;
+    @Column(length = 1000)
+    private String previousSurgeries;
+    @Column(length = 1000)
+    private String currentMedications;
+    private String aadhaarNumber;
+    private String panNumber;
+    private String insuranceCompany;
+    private String insurancePolicyNumber;
+    private String insuranceValidTill;
+    private String username;
+
     // Default constructor
     public Patient() {
     }
@@ -262,5 +285,149 @@ public class Patient {
 
     public void setChildGrowthPercentile(String childGrowthPercentile) {
         this.childGrowthPercentile = childGrowthPercentile;
+    }
+
+    public Integer getAge() {
+        return age;
+    }
+
+    public void setAge(Integer age) {
+        this.age = age;
+    }
+
+    public String getProfilePhoto() {
+        return profilePhoto;
+    }
+
+    public void setProfilePhoto(String profilePhoto) {
+        this.profilePhoto = profilePhoto;
+    }
+
+    public String getAddressHouseNumber() {
+        return addressHouseNumber;
+    }
+
+    public void setAddressHouseNumber(String addressHouseNumber) {
+        this.addressHouseNumber = addressHouseNumber;
+    }
+
+    public String getAddressStreet() {
+        return addressStreet;
+    }
+
+    public void setAddressStreet(String addressStreet) {
+        this.addressStreet = addressStreet;
+    }
+
+    public String getAddressCity() {
+        return addressCity;
+    }
+
+    public void setAddressCity(String addressCity) {
+        this.addressCity = addressCity;
+    }
+
+    public String getAddressState() {
+        return addressState;
+    }
+
+    public void setAddressState(String addressState) {
+        this.addressState = addressState;
+    }
+
+    public String getAddressPincode() {
+        return addressPincode;
+    }
+
+    public void setAddressPincode(String addressPincode) {
+        this.addressPincode = addressPincode;
+    }
+
+    public String getEmergencyRelation() {
+        return emergencyRelation;
+    }
+
+    public void setEmergencyRelation(String emergencyRelation) {
+        this.emergencyRelation = emergencyRelation;
+    }
+
+    public Double getHeight() {
+        return height;
+    }
+
+    public void setHeight(Double height) {
+        this.height = height;
+    }
+
+    public Double getWeight() {
+        return weight;
+    }
+
+    public void setWeight(Double weight) {
+        this.weight = weight;
+    }
+
+    public String getPreviousSurgeries() {
+        return previousSurgeries;
+    }
+
+    public void setPreviousSurgeries(String previousSurgeries) {
+        this.previousSurgeries = previousSurgeries;
+    }
+
+    public String getCurrentMedications() {
+        return currentMedications;
+    }
+
+    public void setCurrentMedications(String currentMedications) {
+        this.currentMedications = currentMedications;
+    }
+
+    public String getAadhaarNumber() {
+        return aadhaarNumber;
+    }
+
+    public void setAadhaarNumber(String aadhaarNumber) {
+        this.aadhaarNumber = aadhaarNumber;
+    }
+
+    public String getPanNumber() {
+        return panNumber;
+    }
+
+    public void setPanNumber(String panNumber) {
+        this.panNumber = panNumber;
+    }
+
+    public String getInsuranceCompany() {
+        return insuranceCompany;
+    }
+
+    public void setInsuranceCompany(String insuranceCompany) {
+        this.insuranceCompany = insuranceCompany;
+    }
+
+    public String getInsurancePolicyNumber() {
+        return insurancePolicyNumber;
+    }
+
+    public void setInsurancePolicyNumber(String insurancePolicyNumber) {
+        this.insurancePolicyNumber = insurancePolicyNumber;
+    }
+
+    public String getInsuranceValidTill() {
+        return insuranceValidTill;
+    }
+
+    public void setInsuranceValidTill(String insuranceValidTill) {
+        this.insuranceValidTill = insuranceValidTill;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
     }
 }

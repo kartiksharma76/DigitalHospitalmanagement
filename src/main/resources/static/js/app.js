@@ -22,7 +22,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (cached) {
         activeSession = JSON.parse(cached);
         setupAuthenticatedState();
-        navigate('dashboard');
+        if (activeSession.role === 'PATIENT') {
+            navigate('patient-dashboard');
+        } else {
+            navigate('dashboard');
+        }
     } else {
         navigate('login');
     }
@@ -42,6 +46,25 @@ function updateClock() {
 
 // Single Page Application Navigation Router
 function navigate(panelId) {
+    // Check custom routing states
+    if (panelId === 'forgot-password' || panelId === 'patient-registration') {
+        const sidebar = document.querySelector(".sidebar");
+        const topbar = document.querySelector(".topbar");
+        if (sidebar) sidebar.classList.add("hidden");
+        if (topbar) topbar.classList.add("hidden");
+        
+        // Hide login, show correct overlay
+        const panels = document.querySelectorAll(".view-panel");
+        panels.forEach(panel => {
+            if (panel.id === `view-${panelId}`) {
+                panel.classList.remove("hidden");
+            } else {
+                panel.classList.add("hidden");
+            }
+        });
+        return;
+    }
+
     if (!activeSession && panelId !== 'login') {
         panelId = 'login';
     }
@@ -92,6 +115,12 @@ function navigate(panelId) {
         if (panelId === 'ambulance') loadAmbulances();
         if (panelId === 'blood-bank') loadBloodBank();
         if (panelId === 'clinicians') loadClinicians();
+        if (panelId === 'patient-dashboard') loadPatientDashboard();
+        if (panelId === 'patient-services') loadPatientServices();
+        if (panelId === 'patient-store') loadPatientStore();
+        if (panelId === 'user-approval') loadUserApprovals();
+        if (panelId === 'store-orders') loadAdminOrders();
+        if (panelId === 'bed-bookings') loadAdminBedBookings();
     }
 }
 
@@ -122,7 +151,11 @@ async function handleLogin(event) {
             activeSession = session;
             localStorage.setItem("aura_session", JSON.stringify(session));
             setupAuthenticatedState();
-            navigate('dashboard');
+            if (session.role === 'PATIENT') {
+                navigate('patient-dashboard');
+            } else {
+                navigate('dashboard');
+            }
             
             // Clear input fields
             userEl.value = "";
@@ -145,6 +178,40 @@ function setupAuthenticatedState() {
     // Update user widget info
     document.getElementById("user-display-name").textContent = activeSession.fullName;
     document.getElementById("user-display-role").textContent = activeSession.role.replace("_", " ");
+
+    const isPatient = activeSession.role === "PATIENT";
+    const isAdmin = activeSession.role === "SUPER_ADMIN";
+
+    // Manage show/hide of dynamic tags
+    document.querySelectorAll(".patient-only").forEach(el => {
+        if (isPatient) el.classList.remove("hidden");
+        else el.classList.add("hidden");
+    });
+
+    document.querySelectorAll(".admin-only").forEach(el => {
+        if (isAdmin) el.classList.remove("hidden");
+        else el.classList.add("hidden");
+    });
+
+    // Hide standard clinician sidebar items for patients
+    const clinicianNavLabels = ["General Operations", "Clinical Core", "AI & Analytics", "Administration"];
+    const navSections = document.querySelectorAll(".nav-section-label");
+    navSections.forEach(label => {
+        const txt = label.textContent.trim();
+        if (clinicianNavLabels.includes(txt)) {
+            if (isPatient) label.classList.add("hidden");
+            else label.classList.remove("hidden");
+        }
+    });
+
+    const items = document.querySelectorAll(".sidebar-nav a.nav-item");
+    items.forEach(item => {
+        const href = item.getAttribute("href");
+        if (href && !href.includes("patient") && !href.includes("user-approval") && !href.includes("store-orders") && !href.includes("bed-bookings")) {
+            if (isPatient) item.classList.add("hidden");
+            else item.classList.remove("hidden");
+        }
+    });
 }
 
 async function logout() {
@@ -1555,68 +1622,1136 @@ async function loadClinicians() {
             const doctors = await res.json();
             tbody.innerHTML = "";
             if (doctors.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted)">No registered staff members.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted)">No registered specialists.</td></tr>`;
+            } else {
+                doctors.forEach(d => {
+                    tbody.innerHTML += `
+                        <tr>
+                            <td><strong>${d.doctorId}</strong></td>
+                            <td>Dr. ${d.firstName} ${d.lastName}</td>
+                            <td>${d.specialization}</td>
+                            <td><span class="badge badge-secondary">${d.department}</span></td>
+                            <td>${d.qualification || 'N/A'}</td>
+                            <td>${d.availability}</td>
+                            <td>$${d.consultationFee.toFixed(2)}</td>
+                        </tr>
+                    `;
+                });
+            }
+        }
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--neon-rose)">Failed to communicate with doctor database.</td></tr>`;
+    }
+
+    // Also load nurses
+    loadNurses();
+}
+
+async function loadNurses() {
+    const tbody = document.getElementById("nursesTableBody");
+    if (!tbody) return;
+    
+    tbody.innerHTML = `<tr><td colspan="6"><i class="fa-solid fa-spinner fa-spin"></i> Retrieving nursing staff roster...</td></tr>`;
+    
+    try {
+        const res = await fetch("/api/nurses");
+        if (res.ok) {
+            const nurses = await res.json();
+            tbody.innerHTML = "";
+            if (nurses.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted)">No registered nursing staff.</td></tr>`;
+            } else {
+                nurses.forEach(n => {
+                    tbody.innerHTML += `
+                        <tr>
+                            <td><strong>${n.nurseId}</strong></td>
+                            <td>Nurse ${n.firstName} ${n.lastName}</td>
+                            <td><span class="badge badge-secondary">${n.department}</span></td>
+                            <td>${n.availability}</td>
+                            <td>${n.shiftTimings}</td>
+                            <td><span class="badge badge-emerald">Active</span></td>
+                        </tr>
+                    `;
+                });
+            }
+        }
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--neon-rose)">Failed to communicate with nurse database.</td></tr>`;
+    }
+}
+
+function switchRosterTab(tab) {
+    const btnDoctors = document.getElementById("btn-roster-doctors");
+    const btnNurses = document.getElementById("btn-roster-nurses");
+    const containerDoctors = document.getElementById("container-roster-doctors");
+    const containerNurses = document.getElementById("container-roster-nurses");
+
+    if (!btnDoctors || !btnNurses || !containerDoctors || !containerNurses) return;
+
+    if (tab === 'doctors') {
+        btnDoctors.classList.add("active-tab");
+        btnNurses.classList.remove("active-tab");
+        containerDoctors.classList.remove("hidden");
+        containerNurses.classList.add("hidden");
+    } else {
+        btnDoctors.classList.remove("active-tab");
+        btnNurses.classList.add("active-tab");
+        containerDoctors.classList.add("hidden");
+        containerNurses.classList.remove("hidden");
+    }
+}
+
+function toggleStaffFormFields() {
+    const roleType = document.getElementById("staff-role-type").value;
+    const specFields = document.getElementById("doctor-specific-fields");
+    if (!specFields) return;
+
+    if (roleType === 'NURSE') {
+        specFields.classList.add("hidden");
+    } else {
+        specFields.classList.remove("hidden");
+    }
+}
+
+async function handleRegisterStaff(event) {
+    event.preventDefault();
+    if (!activeSession) return;
+
+    const roleType = document.getElementById("staff-role-type").value;
+    const first = document.getElementById("doc-first-name").value;
+    const last = document.getElementById("doc-last-name").value;
+    const dept = document.getElementById("doc-department").value;
+    const weekly = document.getElementById("doc-weekly").value;
+    const daily = document.getElementById("doc-daily").value;
+
+    if (roleType === 'DOCTOR') {
+        const spec = document.getElementById("doc-specialization").value || "General Medicine";
+        const qual = document.getElementById("doc-qualification").value || "MBBS";
+        const exp = document.getElementById("doc-experience").value || "5";
+        const fee = document.getElementById("doc-fee").value || "100";
+
+        try {
+            const res = await fetch(`/api/doctors?requestedBy=${activeSession.username}&role=${activeSession.role}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    firstName: first,
+                    lastName: last,
+                    specialization: spec,
+                    qualification: qual,
+                    experienceYears: parseInt(exp),
+                    department: dept,
+                    consultationFee: parseFloat(fee),
+                    availability: weekly,
+                    shiftTimings: daily,
+                    active: true
+                })
+            });
+
+            if (res.ok) {
+                alert("New Clinician registered and activated successfully!");
+                document.getElementById("addDoctorForm").reset();
+                toggleStaffFormFields();
+                loadClinicians();
+            } else {
+                alert("Failed to register clinician. Verify values.");
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    } else {
+        // Register NURSE
+        try {
+            const res = await fetch(`/api/nurses?requestedBy=${activeSession.username}&role=${activeSession.role}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    firstName: first,
+                    lastName: last,
+                    department: dept,
+                    availability: weekly,
+                    shiftTimings: daily,
+                    active: true
+                })
+            });
+
+            if (res.ok) {
+                alert("New nursing staff registered and activated successfully!");
+                document.getElementById("addDoctorForm").reset();
+                toggleStaffFormFields();
+                loadClinicians();
+            } else {
+                alert("Failed to register nursing staff profile.");
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+}
+
+// ==========================================================================
+// PATIENT PORTAL EXTENDED FRONTEND SERVICES
+// ==========================================================================
+
+let cart = [];
+let currentStoreFilter = 'All';
+
+// Age Auto Calculation
+function calculateSelfRegistrationAge() {
+    const dobInput = document.getElementById("self-dob").value;
+    const ageInput = document.getElementById("self-age");
+    if (!dobInput) return;
+    try {
+        const dob = new Date(dobInput);
+        const diff = Date.now() - dob.getTime();
+        const ageDate = new Date(diff);
+        const age = Math.abs(ageDate.getUTCFullYear() - 1970);
+        ageInput.value = age;
+    } catch (e) {
+        ageInput.value = 0;
+    }
+}
+
+// Patient Self Registration Submit
+async function handleSelfRegistration(event) {
+    event.preventDefault();
+    const errEl = document.getElementById("reg-error");
+    const succEl = document.getElementById("reg-success");
+    errEl.classList.add("hidden");
+    succEl.classList.add("hidden");
+
+    const payload = {
+        username: document.getElementById("self-username").value,
+        password: document.getElementById("self-password").value,
+        fullName: document.getElementById("self-fullname").value,
+        email: document.getElementById("self-email").value,
+        gender: document.getElementById("self-gender").value,
+        dateOfBirth: document.getElementById("self-dob").value,
+        bloodGroup: document.getElementById("self-bloodgroup").value,
+        phoneNumber: document.getElementById("self-phone").value,
+        profilePhoto: document.getElementById("self-photo") ? document.getElementById("self-photo").value : "",
+        addressHouseNumber: document.getElementById("self-house").value,
+        addressStreet: document.getElementById("self-street").value,
+        addressCity: document.getElementById("self-city").value,
+        addressState: document.getElementById("self-state").value,
+        addressPincode: document.getElementById("self-pincode").value,
+        emergencyContactName: document.getElementById("self-emergency-name").value,
+        emergencyRelation: document.getElementById("self-emergency-relation").value,
+        emergencyContactPhone: document.getElementById("self-emergency-phone").value,
+        height: document.getElementById("self-height").value,
+        weight: document.getElementById("self-weight").value,
+        allergies: document.getElementById("self-allergies").value,
+        chronicDiseases: document.getElementById("self-diseases").value,
+        previousSurgeries: document.getElementById("self-surgeries").value,
+        currentMedications: document.getElementById("self-medications").value,
+        aadhaarNumber: document.getElementById("self-aadhaar").value,
+        panNumber: document.getElementById("self-pan").value,
+        insuranceCompany: document.getElementById("self-insurance-company").value,
+        insurancePolicyNumber: document.getElementById("self-insurance-policy").value,
+        insuranceValidTill: document.getElementById("self-insurance-valid").value
+    };
+
+    try {
+        const res = await fetch("/api/auth/register-patient", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+            const data = await res.json();
+            succEl.textContent = data.message;
+            succEl.classList.remove("hidden");
+            document.getElementById("selfRegistrationForm").reset();
+            setTimeout(() => { navigate('login'); }, 4000);
+        } else {
+            const data = await res.json();
+            errEl.textContent = data.message || "Failed self registration request.";
+            errEl.classList.remove("hidden");
+        }
+    } catch (e) {
+        errEl.textContent = "Error: Cannot reach security database server.";
+        errEl.classList.remove("hidden");
+    }
+}
+
+// Forgot Password Flow
+async function handleForgotPassword(event) {
+    event.preventDefault();
+    const errEl = document.getElementById("forgot-error");
+    const succEl = document.getElementById("forgot-success");
+    errEl.classList.add("hidden");
+    succEl.classList.add("hidden");
+
+    const payload = {
+        username: document.getElementById("forgot-username").value,
+        aadhaarNumber: document.getElementById("forgot-aadhaar").value
+    };
+
+    try {
+        const res = await fetch("/api/auth/forgot-password", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+            succEl.textContent = "Identity verified. Please set a new password below.";
+            succEl.classList.remove("hidden");
+            document.getElementById("resetForm").classList.remove("hidden");
+            document.getElementById("forgotForm").classList.add("hidden");
+        } else {
+            const data = await res.json();
+            errEl.textContent = data.message;
+            errEl.classList.remove("hidden");
+        }
+    } catch (e) {
+        errEl.textContent = "Error communicating with secure authentication server.";
+        errEl.classList.remove("hidden");
+    }
+}
+
+// Reset Password Flow
+async function handleResetPassword(event) {
+    event.preventDefault();
+    const errEl = document.getElementById("forgot-error");
+    const succEl = document.getElementById("forgot-success");
+    errEl.classList.add("hidden");
+    succEl.classList.add("hidden");
+
+    const payload = {
+        username: document.getElementById("forgot-username").value,
+        aadhaarNumber: document.getElementById("forgot-aadhaar").value,
+        newPassword: document.getElementById("reset-new-password").value
+    };
+
+    try {
+        const res = await fetch("/api/auth/reset-password", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+            const data = await res.json();
+            succEl.textContent = data.message + " Redirecting...";
+            succEl.classList.remove("hidden");
+            document.getElementById("resetForm").reset();
+            document.getElementById("forgotForm").reset();
+            setTimeout(() => {
+                document.getElementById("resetForm").classList.add("hidden");
+                document.getElementById("forgotForm").classList.remove("hidden");
+                navigate('login');
+            }, 3000);
+        } else {
+            const data = await res.json();
+            errEl.textContent = data.message;
+            errEl.classList.remove("hidden");
+        }
+    } catch (e) {
+        errEl.textContent = "Error resetting password.";
+        errEl.classList.remove("hidden");
+    }
+}
+
+// ==========================================================================
+// PATIENT PORTAL PORTAL LOADERS & ACTIONS
+// ==========================================================================
+
+async function loadPatientDashboard() {
+    const profileDiv = document.getElementById("p-portal-profile");
+    const recordsDiv = document.getElementById("p-portal-records");
+    if (!profileDiv || !recordsDiv) return;
+
+    profileDiv.innerHTML = `<div><i class="fa-solid fa-spinner fa-spin"></i> Loading profile...</div>`;
+    recordsDiv.innerHTML = `<div><i class="fa-solid fa-spinner fa-spin"></i> Loading health records...</div>`;
+
+    try {
+        // Fetch all patients and find logged in patient
+        const res = await fetch("/api/patients");
+        if (res.ok) {
+            const allPatients = await res.json();
+            const patient = allPatients.find(p => p.username === activeSession.username);
+            
+            if (patient) {
+                // Populate Profile
+                profileDiv.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:16px; margin-bottom:16px;">
+                        <div class="user-avatar" style="width:60px; height:60px; font-size:24px;">
+                            ${patient.profilePhoto ? `<img src="${patient.profilePhoto}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">` : `<i class="fa-solid fa-user"></i>`}
+                        </div>
+                        <div>
+                            <h3 style="font-size:18px;">${patient.firstName} ${patient.lastName}</h3>
+                            <span class="badge badge-cyan" style="position:static;">Patient ID: ${patient.patientId}</span>
+                        </div>
+                    </div>
+                    <p><strong>Aadhaar Number:</strong> ${patient.aadhaarNumber || 'Not Linked'}</p>
+                    <p><strong>PAN Card Number:</strong> ${patient.panNumber || 'N/A'}</p>
+                    <p><strong>Date of Birth:</strong> ${patient.dateOfBirth} (Age: ${patient.age || 'N/A'})</p>
+                    <p><strong>Mobile Number:</strong> ${patient.phoneNumber}</p>
+                    <p><strong>Blood Group:</strong> <span class="blood-donor-badge">${patient.bloodGroup}</span></p>
+                    <p><strong>Residential Address:</strong> ${patient.address}</p>
+                    <hr style="border:0; border-top:1px solid var(--border-color); margin:12px 0;">
+                    <h4 style="color:var(--neon-cyan); margin-bottom:8px;">Emergency Contact Details</h4>
+                    <p><strong>Guardian:</strong> ${patient.emergencyContactName} (${patient.emergencyRelation})</p>
+                    <p><strong>Guardian Mobile:</strong> ${patient.emergencyContactPhone}</p>
+                    <hr style="border:0; border-top:1px solid var(--border-color); margin:12px 0;">
+                    <h4 style="color:var(--neon-cyan); margin-bottom:8px;">Insurance Scheme Coverage</h4>
+                    <p><strong>Provider Company:</strong> ${patient.insuranceCompany || 'N/A'}</p>
+                    <p><strong>Policy Number:</strong> ${patient.insurancePolicyNumber || 'N/A'}</p>
+                    <p><strong>Valid Till:</strong> ${patient.insuranceValidTill || 'N/A'}</p>
+                    <hr style="border:0; border-top:1px solid var(--border-color); margin:12px 0;">
+                    <h4 style="color:var(--neon-rose); margin-bottom:8px;">Allergies & Diagnoses</h4>
+                    <p><strong>Allergies:</strong> <span style="color:var(--neon-rose)">${patient.allergies || 'None'}</span></p>
+                    <p><strong>Chronic Illnesses:</strong> ${patient.chronicDiseases || 'None'}</p>
+                    <p><strong>Previous Surgeries:</strong> ${patient.previousSurgeries || 'None'}</p>
+                    <p><strong>Current Medications:</strong> ${patient.currentMedications || 'None'}</p>
+                `;
+
+                // Set cart shipping address automatically
+                const cartAddr = document.getElementById("cart-address");
+                if (cartAddr) cartAddr.value = patient.address;
+
+                // Load EHR Records
+                const recordRes = await fetch(`/api/medical-records/patient/${patient.id}?requestedBy=${activeSession.username}&role=${activeSession.role}`);
+                if (recordRes.ok) {
+                    const records = await recordRes.json();
+                    recordsDiv.innerHTML = "";
+                    if (records.length === 0) {
+                        recordsDiv.innerHTML = `<p style="color:var(--text-muted); font-size:13px;">No clinical EHR entries recorded yet.</p>`;
+                    } else {
+                        records.forEach(r => {
+                            recordsDiv.innerHTML += `
+                                <div class="timeline-event" style="margin-bottom:16px; border-left: 2px solid var(--neon-cyan); padding-left:12px;">
+                                    <span class="date" style="font-size:11px; color:var(--text-muted)">${r.recordDate}</span>
+                                    <div class="title" style="font-weight:600; font-size:13.5px; color:var(--neon-cyan)">Diagnosis: ${r.diagnosis}</div>
+                                    <div class="desc" style="font-size:12.5px; color:var(--text-secondary); margin-top:4px;">
+                                        <p><strong>Vitals:</strong> ${r.vitals}</p>
+                                        <p><strong>Symptoms:</strong> ${r.symptoms}</p>
+                                        <p><strong>Treatment Plan:</strong> ${r.treatmentPlan}</p>
+                                        <p><strong>Prescriptions:</strong> <strong style="color:var(--text-primary)">${r.prescriptions}</strong></p>
+                                        <p style="font-size:11px; margin-top:6px; color:var(--neon-emerald)">${r.doctorDigitalSignature}</p>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                    }
+                }
+
+                // Load Bills
+                loadPatientBills(patient.patientId);
+            }
+        }
+
+        // Load medicine orders and room bookings
+        loadPatientOrders();
+        loadPatientBedBookings();
+
+    } catch (e) {
+        console.error("Error loading patient portal dashboard", e);
+    }
+}
+
+// Switch tabs inside Patient Profile
+function switchPatientTab(tabId) {
+    document.querySelectorAll(".patient-tab-content").forEach(pane => {
+        pane.classList.add("hidden");
+    });
+    document.getElementById(`tab-${tabId}`).classList.remove("hidden");
+
+    document.querySelectorAll(".profile-tabs .tab-btn").forEach(btn => {
+        btn.classList.remove("active-tab");
+    });
+    event.target.classList.add("active-tab");
+}
+
+// Load patient bills
+async function loadPatientBills(patientId) {
+    const tbody = document.getElementById("patientBillsBody");
+    if (!tbody) return;
+    tbody.innerHTML = `<tr><td colspan="5"><i class="fa-solid fa-spinner fa-spin"></i> Retrieving invoices...</td></tr>`;
+
+    try {
+        const res = await fetch("/api/billing");
+        if (res.ok) {
+            const allBills = await res.json();
+            const bills = allBills.filter(b => b.patient.patientId === patientId);
+            tbody.innerHTML = "";
+            if (bills.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted)">No billing invoices found.</td></tr>`;
                 return;
             }
-            doctors.forEach(d => {
+            bills.forEach(b => {
+                let badge = "badge-cyan";
+                if (b.status === "Paid" || b.status === "Claim_Approved") badge = "badge-emerald";
+                else if (b.status === "Unpaid") badge = "badge-danger";
+                
                 tbody.innerHTML += `
                     <tr>
-                        <td><strong>${d.doctorId}</strong></td>
-                        <td>Dr. ${d.firstName} ${d.lastName}</td>
-                        <td>${d.specialization}</td>
-                        <td><span class="badge badge-secondary">${d.department}</span></td>
-                        <td>${d.qualification || 'N/A'}</td>
-                        <td>${d.availability}</td>
-                        <td>$${d.consultationFee.toFixed(2)}</td>
+                        <td><strong>${b.invoiceNumber}</strong></td>
+                        <td>${b.billingDate}</td>
+                        <td>$${b.totalAmount.toFixed(2)}</td>
+                        <td><span class="badge ${badge}">${b.status}</span></td>
+                        <td>
+                            ${b.status === 'Unpaid' ? `<button class="btn btn-primary btn-sm" onclick="payInvoice(${b.id}, 'UPI')">Pay UPI</button>` : `<button class="btn btn-secondary btn-sm" onclick="alert('Downloading transaction PDF...')"><i class="fa-solid fa-download"></i> Receipt</button>`}
+                        </td>
                     </tr>
                 `;
             });
         }
     } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--neon-rose)">Failed to communicate with staff database.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5">Failed to fetch billing tables.</td></tr>`;
     }
 }
 
-async function handleAddDoctor(event) {
-    event.preventDefault();
-    if (!activeSession) return;
-    
-    const first = document.getElementById("doc-first-name").value;
-    const last = document.getElementById("doc-last-name").value;
-    const spec = document.getElementById("doc-specialization").value;
-    const qual = document.getElementById("doc-qualification").value;
-    const exp = document.getElementById("doc-experience").value;
-    const fee = document.getElementById("doc-fee").value;
-    const dept = document.getElementById("doc-department").value;
-    const weekly = document.getElementById("doc-weekly").value;
-    const daily = document.getElementById("doc-daily").value;
-    
+// Load patient medicine orders
+async function loadPatientOrders() {
+    const tbody = document.getElementById("patientOrdersBody");
+    if (!tbody) return;
+    tbody.innerHTML = `<tr><td colspan="5"><i class="fa-solid fa-spinner fa-spin"></i> Fetching orders...</td></tr>`;
+
     try {
-        const res = await fetch(`/api/doctors?requestedBy=${activeSession.username}&role=${activeSession.role}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                firstName: first,
-                lastName: last,
-                specialization: spec,
-                qualification: qual,
-                experienceYears: parseInt(exp),
-                department: dept,
-                consultationFee: parseFloat(fee),
-                availability: weekly,
-                shiftTimings: daily,
-                active: true
-            })
-        });
-        
+        const res = await fetch(`/api/store/orders/patient/${activeSession.username}`);
         if (res.ok) {
-            alert("New clinician registered and activated successfully!");
-            document.getElementById("addDoctorForm").reset();
-            loadClinicians();
-        } else {
-            alert("Failed to add clinician. Verify parameters.");
+            const orders = await res.json();
+            tbody.innerHTML = "";
+            if (orders.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted)">No purchase orders recorded.</td></tr>`;
+                return;
+            }
+            orders.forEach(o => {
+                let badge = "badge-cyan";
+                if (o.status === "Delivered") badge = "badge-emerald";
+                else if (o.status === "Dispatched") badge = "badge-amber";
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td><strong>#ORD-${o.id}</strong></td>
+                        <td>${o.orderDate}</td>
+                        <td>${o.items}</td>
+                        <td>$${o.totalAmount.toFixed(2)}</td>
+                        <td><span class="badge ${badge}">${o.status}</span></td>
+                    </tr>
+                `;
+            });
         }
     } catch (e) {
-        console.error("Error creating staff record:", e);
+        tbody.innerHTML = `<tr><td colspan="5">Failed to load order history.</td></tr>`;
     }
 }
+
+// Load patient bed bookings
+async function loadPatientBedBookings() {
+    const tbody = document.getElementById("patientBookingsBody");
+    if (!tbody) return;
+    tbody.innerHTML = `<tr><td colspan="5"><i class="fa-solid fa-spinner fa-spin"></i> Fetching bed bookings...</td></tr>`;
+
+    try {
+        const res = await fetch(`/api/bookings/beds/patient/${activeSession.username}`);
+        if (res.ok) {
+            const bookings = await res.json();
+            tbody.innerHTML = "";
+            if (bookings.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted)">No bed allocations booked.</td></tr>`;
+                return;
+            }
+            bookings.forEach(b => {
+                let badge = b.status === "Active" ? "badge-cyan" : "badge-emerald";
+                tbody.innerHTML += `
+                    <tr>
+                        <td><strong>#BK-${b.id}</strong></td>
+                        <td>${b.bookingDate}</td>
+                        <td>${b.roomType} (Room: ${b.roomNumber})</td>
+                        <td>$${b.totalAmount.toFixed(2)} ($${b.pricePerDay}/day for ${b.days} days)</td>
+                        <td><span class="badge ${badge}">${b.status}</span></td>
+                    </tr>
+                `;
+            });
+        }
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="5">Failed to load bed bookings.</td></tr>`;
+    }
+}
+
+// ==========================================================================
+// PATIENT SERVICES BOOKING FORMS
+// ==========================================================================
+
+function loadPatientServices() {
+    showBookingForm('appointment');
+}
+
+function showBookingForm(type) {
+    const pane = document.getElementById("servicesFormPane");
+    if (!pane) return;
+
+    if (type === 'appointment') {
+        pane.innerHTML = `
+            <h3>Book Specialist Appointment</h3>
+            <form id="pBookApptForm" onsubmit="handlePatientBookAppointment(event)" style="margin-top:20px;">
+                <div class="form-group">
+                    <label>Select Clinical Department Specialty</label>
+                    <select id="p-appt-specialty" onchange="filterDoctorsBySpecialty()" required>
+                        <option value="Cardiology">Cardiology</option>
+                        <option value="Pediatrics">Pediatrics</option>
+                        <option value="General Medicine">General Medicine</option>
+                        <option value="Neurology">Neurology</option>
+                        <option value="Orthopedics">Orthopedics</option>
+                        <option value="Dentist">Dentist</option>
+                        <option value="ENT">ENT</option>
+                        <option value="Eye Specialist">Eye Specialist</option>
+                        <option value="Skin Specialist">Skin Specialist</option>
+                        <option value="Gynecologist">Gynecologist</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Select Assigned Doctor Consultant</label>
+                    <select id="p-appt-doctor" required>
+                        <!-- Loaded dynamically -->
+                    </select>
+                </div>
+                <div class="form-group inline-row" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                    <div>
+                        <label>Appointment Date</label>
+                        <input type="date" id="p-appt-date" value="${new Date().toISOString().split('T')[0]}" required>
+                    </div>
+                    <div>
+                        <label>Appointment Time Slot</label>
+                        <input type="time" id="p-appt-time" value="10:00" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Consultation Channel Type</label>
+                    <select id="p-appt-type">
+                        <option value="OPD">General Physician In-Hospital OPD</option>
+                        <option value="Telemedicine">Online Video Consultation</option>
+                        <option value="Emergency">Urgent Emergency Triage</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block glow-btn">Generate Appointment Token</button>
+            </form>
+        `;
+        filterDoctorsBySpecialty();
+    } else if (type === 'bed') {
+        pane.innerHTML = `
+            <h3>Book Ward Bed / Private Room Allocation</h3>
+            <form id="pBookBedForm" onsubmit="handlePatientBookBed(event)" style="margin-top:20px;">
+                <div class="form-group">
+                    <label>Select Ward Type Preference</label>
+                    <select id="p-bed-type" onchange="updateBedPriceHint()" required>
+                        <option value="General Ward" data-price="20.00">General Ward ($20.00 / Day)</option>
+                        <option value="Semi Private Room" data-price="55.00">Semi Private Room ($55.00 / Day)</option>
+                        <option value="Private Room" data-price="120.00">Private Room AC ($120.00 / Day)</option>
+                        <option value="Deluxe Room" data-price="250.00">Deluxe Room (TV, WiFi, Sofa) ($250.00 / Day)</option>
+                        <option value="ICU" data-price="500.00">ICU ventilator & Monitor Bed ($500.00 / Day)</option>
+                        <option value="NICU" data-price="600.00">NICU Newborn Care Bed ($600.00 / Day)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Allocation Duration (Days)</label>
+                    <input type="number" id="p-bed-days" value="1" min="1" max="60" oninput="updateBedPriceHint()" required>
+                </div>
+                <div style="background:rgba(255,255,255,0.02); border:1px dashed var(--border-color); padding:16px; border-radius:8px; margin-bottom:20px; text-align:center;">
+                    <span style="font-size:12px; color:var(--text-muted)">Estimated Booking Valuation</span>
+                    <h3 id="p-bed-valuation" style="color:var(--neon-emerald); font-size:24px; margin-top:4px;">$20.00</h3>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block glow-btn">Reserve Bed Allocation</button>
+            </form>
+        `;
+    } else if (type === 'ambulance') {
+        pane.innerHTML = `
+            <h3>Emergency Ambulance Dispatch Protocol</h3>
+            <form id="pBookAmbForm" onsubmit="handlePatientBookAmbulance(event)" style="margin-top:20px;">
+                <div class="form-group">
+                    <label>Select Ambulance Support Level</label>
+                    <select id="p-amb-type" required>
+                        <option value="Basic Ambulance">Basic Support Level ($50.00)</option>
+                        <option value="Oxygen Ambulance">Advanced Oxygen Supply Level ($100.00)</option>
+                        <option value="ICU Ambulance">Critical Care ICU Ventilator Level ($250.00)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Accident / Dispatch Location Address</label>
+                    <textarea id="p-amb-address" placeholder="Specify complete pickup location coordinates..." required></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block glow-btn" style="background:var(--neon-rose); box-shadow:0 0 10px rgba(244,63,94,0.3)">Dispatch Fleet Vehicle Now</button>
+            </form>
+        `;
+        // Autofill address
+        fetch("/api/patients").then(r => r.json()).then(list => {
+            const patient = list.find(p => p.username === activeSession.username);
+            if (patient) {
+                document.getElementById("p-amb-address").value = patient.address;
+            }
+        });
+    }
+}
+
+// Filter doctor dropdown by specialty
+async function filterDoctorsBySpecialty() {
+    const spec = document.getElementById("p-appt-specialty").value;
+    const docSelect = document.getElementById("p-appt-doctor");
+    if (!docSelect) return;
+    docSelect.innerHTML = `<option>Retrieving specialists...</option>`;
+
+    try {
+        const res = await fetch("/api/doctors");
+        if (res.ok) {
+            const doctors = await res.json();
+            const filtered = doctors.filter(d => d.specialization.toLowerCase().includes(spec.toLowerCase()) || d.department.toLowerCase().includes(spec.toLowerCase()));
+            docSelect.innerHTML = "";
+            if (filtered.length === 0) {
+                docSelect.innerHTML = `<option value="3">Dr. John Watson (General Medicine - Fallback Specialist)</option>`;
+            } else {
+                filtered.forEach(d => {
+                    docSelect.innerHTML += `<option value="${d.id}">Dr. ${d.firstName} ${d.lastName} ($${d.consultationFee.toFixed(2)})</option>`;
+                });
+            }
+        }
+    } catch (e) {
+        docSelect.innerHTML = `<option value="3">Dr. John Watson (Fallback)</option>`;
+    }
+}
+
+// Update Bed Booking price total
+function updateBedPriceHint() {
+    const select = document.getElementById("p-bed-type");
+    const daysInput = document.getElementById("p-bed-days");
+    const valText = document.getElementById("p-bed-valuation");
+    if (!select || !daysInput || !valText) return;
+
+    const opt = select.options[select.selectedIndex];
+    const price = parseFloat(opt.getAttribute("data-price"));
+    const days = parseInt(daysInput.value) || 1;
+    valText.textContent = `$${(price * days).toFixed(2)}`;
+}
+
+// Submit Patient Appointment Booking
+async function handlePatientBookAppointment(event) {
+    event.preventDefault();
+    try {
+        const patientsRes = await fetch("/api/patients");
+        const allPatients = await patientsRes.json();
+        const patient = allPatients.find(p => p.username === activeSession.username);
+        
+        if (!patient) {
+            alert("Error: Active clinical record profile not found.");
+            return;
+        }
+
+        const payload = {
+            patient: { id: patient.id },
+            doctor: { id: parseInt(document.getElementById("p-appt-doctor").value) },
+            date: document.getElementById("p-appt-date").value,
+            time: document.getElementById("p-appt-time").value,
+            type: document.getElementById("p-appt-type").value,
+            status: "Scheduled"
+        };
+
+        const res = await fetch(`/api/appointments?requestedBy=${activeSession.username}&role=${activeSession.role}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+            alert("Specialist Appointment booked successfully! Dynamic queue token generated.");
+            navigate('patient-dashboard');
+        } else {
+            alert("Appointment scheduling transaction failed.");
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+// Submit Patient Bed Booking
+async function handlePatientBookBed(event) {
+    event.preventDefault();
+    try {
+        const select = document.getElementById("p-bed-type");
+        const opt = select.options[select.selectedIndex];
+        const price = parseFloat(opt.getAttribute("data-price"));
+
+        const payload = {
+            patientUsername: activeSession.username,
+            patientName: activeSession.fullName,
+            roomType: select.value,
+            days: parseInt(document.getElementById("p-bed-days").value),
+            pricePerDay: price
+        };
+
+        const res = await fetch("/api/bookings/bed", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+            alert("Room/Bed reservation completed! Dashboard updated.");
+            navigate('patient-dashboard');
+        } else {
+            alert("Bed booking request failed.");
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+// Submit Patient Ambulance dispatch
+async function handlePatientBookAmbulance(event) {
+    event.preventDefault();
+    const support = document.getElementById("p-amb-type").value;
+    const address = document.getElementById("p-amb-address").value;
+    
+    alert(`DISPATCH SYSTEM ALERT: ICU/Ambulance vehicle has been dispatched coordinates: ${address} [Emergency code support level: ${support}]. Driver contact coordinates will follow shortly.`);
+    navigate('patient-dashboard');
+}
+
+// ==========================================================================
+// PHARMACY E-COMMERCE MEDICINE STORE
+// ==========================================================================
+
+async function loadPatientStore() {
+    const grid = document.getElementById("store-products-grid");
+    if (!grid) return;
+    grid.innerHTML = `<div style="grid-column:1/-1; text-align:center;"><i class="fa-solid fa-spinner fa-spin"></i> Synchronizing inventory stocks...</div>`;
+
+    try {
+        const res = await fetch("/api/inventory");
+        if (res.ok) {
+            cachedInventory = await res.json();
+            renderStoreProducts();
+        }
+    } catch (e) {
+        grid.innerHTML = `<div style="grid-column:1/-1; color:var(--neon-rose)">Failed to sync products.</div>`;
+    }
+}
+
+function renderStoreProducts() {
+    const grid = document.getElementById("store-products-grid");
+    if (!grid) return;
+    grid.innerHTML = "";
+
+    // Categories we want to filter
+    const filtered = cachedInventory.filter(item => {
+        if (currentStoreFilter === 'All') {
+            return ["Tablets", "Capsules", "Syrups", "Injections", "Creams", "Eye Drops", "Ear Drops", "Medical Equipment", "Hospital Supplies", "Packages"].includes(item.category);
+        }
+        return item.category === currentStoreFilter;
+    });
+
+    if (filtered.length === 0) {
+        grid.innerHTML = `<div style="grid-column:1/-1; text-align:center; color:var(--text-muted)">No items found in this category.</div>`;
+        return;
+    }
+
+    filtered.forEach(item => {
+        grid.innerHTML += `
+            <div class="product-card">
+                <div>
+                    <span class="product-cat">${item.category}</span>
+                    <h4 class="product-name" style="margin:4px 0 8px 0;">${item.name}</h4>
+                    <span class="product-price">$${item.unitPrice.toFixed(2)}</span>
+                </div>
+                <div>
+                    <p class="product-stock" style="margin-bottom:8px;">Stock: ${item.stockQuantity} available</p>
+                    <div class="product-action">
+                        <input type="number" id="qty-${item.id}" value="1" min="1" max="${item.stockQuantity}" class="product-qty-input">
+                        <button class="btn btn-primary btn-sm" onclick="addItemToCart(${item.id})" style="flex:1;"><i class="fa-solid fa-cart-plus"></i> Buy</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+}
+
+function filterStoreItems(category) {
+    currentStoreFilter = category;
+    
+    // Toggle active classes on category buttons
+    const btns = document.querySelectorAll("#view-patient-store button");
+    btns.forEach(btn => {
+        if (btn.textContent.trim() === category || (category === 'All' && btn.textContent.trim() === 'All Products') || (category === 'Medical Equipment' && btn.textContent.trim() === 'Equipment') || (category === 'Hospital Supplies' && btn.textContent.trim() === 'Supplies') || (category === 'Packages' && btn.textContent.trim() === 'Health Packages')) {
+            btn.classList.add("active-tab");
+        } else if (btn.onclick && btn.onclick.toString().includes("filterStoreItems")) {
+            btn.classList.remove("active-tab");
+        }
+    });
+
+    renderStoreProducts();
+}
+
+function addItemToCart(id) {
+    const item = cachedInventory.find(i => i.id === id);
+    const qtyInput = document.getElementById(`qty-${id}`);
+    if (!item || !qtyInput) return;
+
+    const qty = parseInt(qtyInput.value) || 1;
+    if (qty > item.stockQuantity) {
+        alert("Requested quantity exceeds available inventory stock.");
+        return;
+    }
+
+    // Check if item already exists in cart
+    const existing = cart.find(c => c.itemId === id);
+    if (existing) {
+        existing.quantity += qty;
+    } else {
+        cart.push({
+            itemId: id,
+            name: item.name,
+            price: item.unitPrice,
+            quantity: qty
+        });
+    }
+
+    alert(`Added ${qty} x ${item.name} to shopping cart.`);
+    renderCart();
+}
+
+function renderCart() {
+    const list = document.getElementById("cart-items-list");
+    const totalEl = document.getElementById("cart-total");
+    if (!list || !totalEl) return;
+
+    list.innerHTML = "";
+    if (cart.length === 0) {
+        list.innerHTML = `<p style="color:var(--text-muted); font-size:13px; text-align:center; margin-top:20px;">Your cart is empty.</p>`;
+        totalEl.textContent = "$0.00";
+        return;
+    }
+
+    let total = 0;
+    cart.forEach((c, idx) => {
+        const itemTotal = c.price * c.quantity;
+        total += itemTotal;
+        list.innerHTML += `
+            <div class="cart-item">
+                <div class="cart-item-info">
+                    <span class="cart-item-name">${c.name} (x${c.quantity})</span>
+                    <span class="cart-item-price">$${itemTotal.toFixed(2)}</span>
+                </div>
+                <button class="cart-item-remove" onclick="removeCartItem(${idx})"><i class="fa-solid fa-trash-can"></i></button>
+            </div>
+        `;
+    });
+
+    totalEl.textContent = `$${total.toFixed(2)}`;
+}
+
+function removeCartItem(index) {
+    cart.splice(index, 1);
+    renderCart();
+}
+
+async function checkoutCart(event) {
+    event.preventDefault();
+    if (cart.length === 0) {
+        alert("Cart is empty! Select medicines or supplies from the shelves first.");
+        return;
+    }
+
+    let total = 0;
+    cart.forEach(c => { total += c.price * c.quantity; });
+
+    const payload = {
+        patientUsername: activeSession.username,
+        paymentMethod: document.getElementById("cart-payment").value,
+        deliveryAddress: document.getElementById("cart-address").value,
+        totalAmount: total,
+        items: cart
+    };
+
+    try {
+        const res = await fetch("/api/store/order", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+            alert("Pharmacy order placed successfully! Check your dashboard for delivery status tracking.");
+            cart = [];
+            renderCart();
+            navigate('patient-dashboard');
+        } else {
+            alert("Checkout order processing failed.");
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+// ==========================================================================
+// ADMIN WORKFLOW & MANAGERS
+// ==========================================================================
+
+async function loadUserApprovals() {
+    const tbody = document.getElementById("approvalRequestsBody");
+    if (!tbody) return;
+    tbody.innerHTML = `<tr><td colspan="7"><i class="fa-solid fa-spinner fa-spin"></i> Retrieving registration ledger...</td></tr>`;
+
+    try {
+        const res = await fetch("/api/auth/pending-registrations");
+        if (res.ok) {
+            const users = await res.json();
+            tbody.innerHTML = "";
+            if (users.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted)">No pending patient registrations to review.</td></tr>`;
+                return;
+            }
+            users.forEach(u => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td><strong>${u.id}</strong></td>
+                        <td>${u.username}</td>
+                        <td>${u.fullName}</td>
+                        <td>${u.email}</td>
+                        <td><span class="badge badge-secondary">${u.role}</span></td>
+                        <td><span class="badge badge-amber">${u.approvalStatus}</span></td>
+                        <td>
+                            <div style="display:flex; gap:6px;">
+                                <button class="btn btn-primary btn-sm" style="background:var(--neon-emerald); border-color:var(--neon-emerald)" onclick="approveUser(${u.id})">Approve</button>
+                                <button class="btn btn-secondary btn-sm" style="color:var(--neon-rose); border-color:rgba(244,63,94,0.4)" onclick="rejectUser(${u.id})">Reject</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="7">Failed to load registration queues.</td></tr>`;
+    }
+}
+
+async function approveUser(id) {
+    try {
+        const res = await fetch(`/api/auth/approve-patient/${id}?requestedBy=${activeSession.username}`, {
+            method: "POST"
+        });
+        if (res.ok) {
+            alert("User approved successfully. Login permissions granted.");
+            loadUserApprovals();
+        }
+    } catch(e) { console.error(e); }
+}
+
+async function rejectUser(id) {
+    try {
+        const res = await fetch(`/api/auth/reject-patient/${id}?requestedBy=${activeSession.username}`, {
+            method: "POST"
+        });
+        if (res.ok) {
+            alert("User request canceled and rejected.");
+            loadUserApprovals();
+        }
+    } catch(e) { console.error(e); }
+}
+
+async function loadAdminOrders() {
+    const tbody = document.getElementById("adminOrdersBody");
+    if (!tbody) return;
+    tbody.innerHTML = `<tr><td colspan="8"><i class="fa-solid fa-spinner fa-spin"></i> Retrieving order history...</td></tr>`;
+
+    try {
+        const res = await fetch("/api/store/orders");
+        if (res.ok) {
+            const orders = await res.json();
+            tbody.innerHTML = "";
+            if (orders.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted)">No pharmacy orders found.</td></tr>`;
+                return;
+            }
+            orders.forEach(o => {
+                let badge = "badge-cyan";
+                if (o.status === "Delivered") badge = "badge-emerald";
+                else if (o.status === "Dispatched") badge = "badge-amber";
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td><strong>#ORD-${o.id}</strong></td>
+                        <td>${o.patientUsername}</td>
+                        <td>${o.orderDate}</td>
+                        <td>${o.items}</td>
+                        <td>$${o.totalAmount.toFixed(2)}</td>
+                        <td><span class="badge ${badge}">${o.status}</span></td>
+                        <td style="font-size:12px; max-width:180px; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${o.deliveryAddress}</td>
+                        <td>
+                            <select onchange="updateAdminOrderStatus(${o.id}, this.value)" style="font-size:12px; padding:4px;">
+                                <option value="Pending" ${o.status === 'Pending' ? 'selected' : ''}>Pending</option>
+                                <option value="Dispatched" ${o.status === 'Dispatched' ? 'selected' : ''}>Dispatched</option>
+                                <option value="Delivered" ${o.status === 'Delivered' ? 'selected' : ''}>Delivered</option>
+                            </select>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+    } catch(e) {
+        tbody.innerHTML = `<tr><td colspan="8">Failed to fetch orders.</td></tr>`;
+    }
+}
+
+async function updateAdminOrderStatus(id, status) {
+    try {
+        const res = await fetch(`/api/store/orders/${id}/status?status=${status}&requestedBy=${activeSession.username}&role=${activeSession.role}`, {
+            method: "PUT"
+        });
+        if (res.ok) {
+            alert("Order delivery status updated successfully.");
+            loadAdminOrders();
+        }
+    } catch(e) { console.error(e); }
+}
+
+async function loadAdminBedBookings() {
+    const tbody = document.getElementById("adminBookingsBody");
+    if (!tbody) return;
+    tbody.innerHTML = `<tr><td colspan="9"><i class="fa-solid fa-spinner fa-spin"></i> Loading bed reservations...</td></tr>`;
+
+    try {
+        const res = await fetch("/api/bookings/beds");
+        if (res.ok) {
+            const bookings = await res.json();
+            tbody.innerHTML = "";
+            if (bookings.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:var(--text-muted)">No active room allocations.</td></tr>`;
+                return;
+            }
+            bookings.forEach(b => {
+                let badge = b.status === "Active" ? "badge-cyan" : "badge-emerald";
+                tbody.innerHTML += `
+                    <tr>
+                        <td><strong>#BK-${b.id}</strong></td>
+                        <td>${b.patientUsername}</td>
+                        <td>${b.patientName}</td>
+                        <td>${b.roomType}</td>
+                        <td><strong>${b.roomNumber}</strong></td>
+                        <td>${b.bookingDate}</td>
+                        <td>$${b.pricePerDay}/day</td>
+                        <td><span class="badge ${badge}">${b.status}</span></td>
+                        <td>
+                            ${b.status === 'Active' ? `<button class="btn btn-secondary btn-sm" style="color:var(--neon-rose); border-color:rgba(244,63,94,0.4)" onclick="dischargeAdminBed(${b.id})">Discharge</button>` : `<span style="font-size:12px; color:var(--text-muted)">Closed</span>`}
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+    } catch(e) {
+        tbody.innerHTML = `<tr><td colspan="9">Failed to fetch bookings.</td></tr>`;
+    }
+}
+
+async function dischargeAdminBed(id) {
+    try {
+        const res = await fetch(`/api/bookings/beds/${id}/status?status=Discharged&requestedBy=${activeSession.username}&role=${activeSession.role}`, {
+            method: "PUT"
+        });
+        if (res.ok) {
+            alert("Patient discharged from room successfully.");
+            loadAdminBedBookings();
+        }
+    } catch(e) { console.error(e); }
+}
+
